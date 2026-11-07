@@ -1,0 +1,110 @@
+/* NeoMacros 面板设计令牌
+   基调：VS Code 式 IDE 骨架 + NeoMacros v2 品牌令牌（neomacros-docs/10-ui-ux-spec.md §4）
+   默认深色；:root[data-theme='light'] 覆盖为浅色（index.html 内联脚本无闪启蒙） */
+
+:root {
+  color-scheme: dark;
+
+  /* 底色层级（自上而下渐深） */
+  --bg-app: #101319;          /* 主内容底 */
+  --bg-editor: #0d1016;       /* 编辑器更深一档（D5） */
+  --bg-sidebar: #0e1117;      /* 侧栏 / 面板（v2 sidebarBg） */
+  --bg-chrome: #0a0d12;       /* 标题栏 / 状态栏 / 活动栏 */
+  --bg-elevated: #161b24;     /* 卡片 / 模态 / 输入框 */
+  --bg-elevated-2: #1c2230;   /* 悬浮层 / 下拉 */
+
+  /* 交互态 */
+  --hover: rgba(255, 255, 255, 0.07);
+  --active: rgba(79, 157, 255, 0.16);
+  --selected: rgba(79, 157, 255, 0.24);
+
+  /* 线与分隔 */
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --divider: rgba(255, 255, 255, 0.06);
+
+  /* 品牌与语义色（v2 §4） */
+  --accent: #4f9dff;
+  --accent-hover: #6cadff;
+  --success: #57d98a;
+  --danger: #ff5c5c;
+  --warning: #ffbe4b;
+
+  /* 品牌色/语义色之上的文字 */
+  --on-accent: #08101d;
+  --on-danger: #1d0808;
+
+  /* 文字三级（v2 textPrimary/Secondary/Muted） */
+  --text-1: #ecf1f8;
+  --text-2: #9aa7b8;
+  --text-3: #66707f;
+
+  /* 控件 */
+  --control: rgba(255, 255, 255, 0.13);
+  --control-hover: rgba(255, 255, 255, 0.2);
+
+  /* 滚动条 */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.28);
+
+  /* 几何 */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* 布局尺寸 */
+  --titlebar-h: 38px;
+  --activitybar-w: 46px;
+  --sidebar-w: 280px;
+  --statusbar-h: 24px;
+  --tabsbar-h: 36px;
+
+  /* 字体 */
+  --font-ui: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+
+  /* 动效（克制，仅色彩/位移过渡） */
+  --ease: cubic-bezier(0.25, 0.7, 0.4, 1);
+  --dur: 120ms;
+}
+
+/* ---- 浅色主题 ---- */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-app: #f7f9fc;
+  --bg-editor: #ffffff;
+  --bg-sidebar: #f1f4f9;
+  --bg-chrome: #e9edf4;
+  --bg-elevated: #ffffff;
+  --bg-elevated-2: #ffffff;
+
+  --hover: rgba(13, 22, 38, 0.06);
+  --active: rgba(47, 125, 233, 0.12);
+  --selected: rgba(47, 125, 233, 0.2);
+
+  --border: rgba(13, 22, 38, 0.14);
+  --border-strong: rgba(13, 22, 38, 0.26);
+  --divider: rgba(13, 22, 38, 0.08);
+
+  /* 浅色下品牌蓝加深保证对比度，语义色同步压暗 */
+  --accent: #2f7de9;
+  --accent-hover: #1f6fd0;
+  --success: #1a9e5c;
+  --danger: #d64545;
+  --warning: #b97f14;
+
+  --on-accent: #ffffff;
+  --on-danger: #ffffff;
+
+  --text-1: #1c2733;
+  --text-2: #5a6a7d;
+  --text-3: #8b98a8;
+
+  --control: rgba(13, 22, 38, 0.08);
+  --control-hover: rgba(13, 22, 38, 0.15);
+
+  --scrollbar-thumb: rgba(13, 22, 38, 0.18);
+  --scrollbar-thumb-hover: rgba(13, 22, 38, 0.32);
+}

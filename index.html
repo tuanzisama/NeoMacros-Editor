@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>NeoMacros 面板</title>
+    <script>
+      // 主题无闪启蒙：在样式应用前解析本地偏好（与 src/theme.ts 同口径）
+      try {
+        var s = JSON.parse(localStorage.getItem('neomacros-panel-settings-v1') || '{}')
+        var t =
+          s.theme === 'light'
+            ? 'light'
+            : s.theme === 'auto'
+              ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+              : 'dark'
+        document.documentElement.dataset.theme = t
+      } catch (e) {
+        document.documentElement.dataset.theme = 'dark'
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
