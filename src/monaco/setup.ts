@@ -163,6 +163,9 @@ export function setupMonaco(monaco: Monaco): void {
       'editorWidget.background': '#ffffff',
       'editorWidget.border': '#d7deea',
       'editorSuggestWidget.background': '#ffffff',
+      // Monaco 浅色默认选中前景为白色（配套实心蓝底），此处选中底为半透明，前景须保持深色
+      'editorSuggestWidget.foreground': '#1c2733',
+      'editorSuggestWidget.selectedForeground': '#1c2733',
       'editorSuggestWidget.selectedBackground': '#2f7de922',
       'editorHoverWidget.background': '#ffffff',
       'editorGutter.background': '#ffffff',
