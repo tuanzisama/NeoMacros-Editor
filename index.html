@@ -10,15 +10,14 @@
       // 主题无闪启蒙：在样式应用前解析本地偏好（与 src/theme.ts 同口径）
       try {
         var s = JSON.parse(localStorage.getItem('neomacros-panel-settings-v1') || '{}')
-        var t =
-          s.theme === 'light'
-            ? 'light'
-            : s.theme === 'auto'
-              ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-              : 'dark'
+        var t = s.theme
+        if (t !== 'light' && t !== 'dark') {
+          // 未存储偏好或 auto：跟随系统
+          t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
         document.documentElement.dataset.theme = t
       } catch (e) {
-        document.documentElement.dataset.theme = 'dark'
+        document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
       }
     </script>
   </head>

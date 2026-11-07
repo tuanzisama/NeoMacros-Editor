@@ -30,7 +30,7 @@ export interface PanelSettings {
 }
 
 const DEFAULTS: PanelSettings = {
-  theme: 'dark',
+  theme: 'auto',
   language: 'auto',
   sidebarWidth: 280,
   devtoolsHeight: 260,
