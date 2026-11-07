@@ -11,6 +11,8 @@ import type {
   ConsoleResponse,
   CreateMacroRequest,
   DeviceRecord,
+  EventCatalog,
+  EventCatalogEntry,
   FileSaveResult,
   LogEntry,
   LocatedError,
@@ -273,6 +275,26 @@ export async function stopTask(id: number): Promise<TasksResponse> {
 export async function eventsTicket(): Promise<TicketResponse> {
   const res = await client.request('POST', '/api/v1/events/ticket')
   return res.json() as TicketResponse
+}
+
+/**
+ * 可订阅事件目录（配置弹窗「事件」下拉数据源）。
+ * 旧版 mod 无此端点：404 → 返回 null，调用方降级为仅显示已声明事件。
+ */
+export async function getEventCatalog(): Promise<EventCatalog | null> {
+  try {
+    const res = await client.request('GET', '/api/v1/events/catalog')
+    const data = res.json() as { events?: unknown }
+    if (!Array.isArray(data.events)) throw new ApiError(200, 'internal', 'events 响应不合法')
+    return {
+      events: data.events.filter(
+        (e): e is EventCatalogEntry => typeof (e as EventCatalogEntry)?.name === 'string',
+      ),
+    }
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
+  }
 }
 
 /**

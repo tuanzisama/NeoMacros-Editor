@@ -20,6 +20,20 @@ export const LIFECYCLE_LABELS: Record<Lifecycle, string> = {
   manual: '手动',
 }
 
+/** config.keypress 触发边沿（缺省 keypress） */
+export const KEYPRESS_EDGES = ['keydown', 'keyup', 'keypress'] as const
+export type KeypressEdge = (typeof KEYPRESS_EDGES)[number]
+
+/** 一条可订阅事件（GET /api/v1/events/catalog 条目；EventDescriptor 投影） */
+export interface EventCatalogEntry {
+  name: string
+  cancellable: boolean
+}
+
+export interface EventCatalog {
+  events: EventCatalogEntry[]
+}
+
 /** M3 结构化错误（state.error / 文件保存回传） */
 export interface LocatedError {
   script: string
