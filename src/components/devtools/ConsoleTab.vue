@@ -210,12 +210,14 @@ function stringifyCell(node: ConsoleEntry['args'][number]): string {
 <template>
   <div class="console-tab">
     <div class="tab-toolbar">
+      <span class="tool-label">上下文</span>
       <AppSelect
         v-model="replTarget"
         :options="[{ value: 'devtools', label: 'devtools' }, ...macroOptions]"
         class="context-select"
         title="REPL 执行上下文"
       />
+      <span class="tool-label">宏过滤</span>
       <AppSelect
         v-model="mergedFilters.macroFilter"
         :options="[{ value: '', label: '全部宏' }, ...macroOptions]"
@@ -380,6 +382,13 @@ function stringifyCell(node: ConsoleEntry['args'][number]): string {
   padding: 4px 10px;
   border-bottom: 1px solid var(--divider);
   flex: none;
+}
+
+.tool-label {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-3);
+  user-select: none;
 }
 
 .context-select,
