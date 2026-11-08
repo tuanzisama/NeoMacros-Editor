@@ -2,17 +2,22 @@
 /**
  * 任务管理器表格（DevTools 页签与活动栏主视图共用）。
  * 工具栏：状态过滤 + 搜索 + 列配置（settings 持久化）+ 刷新；
- * 行：宏文件列与名称可点击跳转编辑器；运行中的任务可停止。
+ * 行：名称点击跳宏配置（树中高亮 neomacro.yml）、宏文件列打开入口文件；
+ * 操作列：重启（新契约端点，旧 mod 404 提示）、调试（DevTools 控制台按宏过滤）、运行中可停止。
  */
-import { computed, ref } from 'vue'
-import { tasksStore, filteredTasks, durationText, stopTaskById, refreshTasks } from '@/stores/tasks'
+import { computed } from 'vue'
+import { tasksStore, filteredTasks, durationText, stopTaskById, restartTaskById, debugTask, refreshTasks } from '@/stores/tasks'
 import { macros } from '@/stores/macros'
 import { openMacro } from '@/stores/editor'
+import { revealMacroConfig } from '@/stores/filetree'
 import { focusEditor, notify } from '@/stores/workspace'
 import { settings } from '@/stores/settings'
 import { CATEGORY_LABELS } from '@/types/api'
 import type { TaskEntry } from '@/types/api'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
+import AppPopover from '@/components/ui/AppPopover.vue'
 
 /** 列定义（id 对应 settings.taskColumns 持久化） */
 const COLUMNS = [
@@ -32,13 +37,17 @@ const COLUMNS = [
   { id: 'mcVersion', label: 'MC版本' },
 ] as const
 
+const STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'running', label: '运行中' },
+  { value: 'stopped', label: '已停止' },
+]
+
 const visibleColumns = computed<string[]>(() => {
   const saved = settings.taskColumns
   if (!saved) return COLUMNS.map((c) => c.id)
   return COLUMNS.filter((c) => saved.includes(c.id)).map((c) => c.id)
 })
-
-const showColumns = ref(false)
 
 function toggleColumn(id: string): void {
   const current = visibleColumns.value
@@ -87,51 +96,54 @@ const GAME_TYPE_LABELS: Record<string, string> = {
   multi: '多人',
 }
 
-/** 任务 → 编辑器：打开宏入口文件（编辑面板在主区，先聚焦） */
+/** 任务名称 → 宏配置：跳分类路由 + 树中高亮 neomacro.yml + 配置弹窗 */
+function openConfig(task: TaskEntry): void {
+  void revealMacroConfig(task)
+}
+
+/** 任务宏文件 → 编辑器：打开宏入口文件（编辑面板在主区，先聚焦） */
 async function openTaskMacro(task: TaskEntry): Promise<void> {
   const macro = macros.macros.find((m) => m.name === task.macro)
-  focusEditor()
+  focusEditor(macro?.id ?? `${task.category}/${task.macro}`)
   if (macro) {
     await openMacro(macro)
   } else {
     notify(`宏 ${task.macro} 不在宏列表中（可能加载失败）`, 'warning')
   }
 }
-
-async function stop(task: TaskEntry): Promise<void> {
-  await stopTaskById(task.id)
-}
 </script>
 
 <template>
   <div class="task-table-wrap">
     <div class="task-toolbar">
-      <select v-model="tasksStore.statusFilter" class="status-select">
-        <option value="">全部状态</option>
-        <option value="running">运行中</option>
-        <option value="stopped">已停止</option>
-      </select>
+      <AppSelect
+        v-model="tasksStore.statusFilter"
+        :options="STATUS_OPTIONS"
+        class="status-select"
+        title="状态过滤"
+      />
       <input
         v-model="tasksStore.search"
         class="log-search"
         placeholder="过滤：名称 / 玩家 / 服务器…"
         spellcheck="false"
       />
-      <div class="columns-anchor">
-        <button class="tool" title="设置展示列" @click="showColumns = !showColumns">
-          <AppIcon name="explorer" :size="13" />
-        </button>
-        <div v-if="showColumns" class="columns-pop">
-          <label v-for="c in COLUMNS" :key="c.id" class="column-option">
-            <input
-              type="checkbox"
-              :checked="visibleColumns.includes(c.id)"
-              @change="toggleColumn(c.id)"
-            />
-            {{ c.label }}
-          </label>
+      <AppPopover align="end">
+        <template #trigger>
+          <button class="tool" title="设置展示列">
+            <AppIcon name="explorer" :size="13" />
+          </button>
+        </template>
+        <div class="columns-grid">
+          <AppCheckbox
+            v-for="c in COLUMNS"
+            :key="c.id"
+            :model-value="visibleColumns.includes(c.id)"
+            :label="c.label"
+            @update:model-value="toggleColumn(c.id)"
+          />
         </div>
-      </div>
+      </AppPopover>
       <button class="tool" title="刷新" @click="void refreshTasks()">
         <AppIcon name="refresh" :size="13" />
       </button>
@@ -158,7 +170,7 @@ async function stop(task: TaskEntry): Promise<void> {
                 </span>
               </template>
               <template v-else-if="col === 'name'">
-                <button class="link" :title="`打开 ${task.macro}`" @click="void openTaskMacro(task)">
+                <button class="link" :title="`打开 ${task.macro} 配置`" @click="openConfig(task)">
                   {{ task.macro }}
                 </button>
               </template>
@@ -205,11 +217,21 @@ async function stop(task: TaskEntry): Promise<void> {
               </template>
             </td>
             <td class="cell col-actions">
+              <button class="tool" title="调试（控制台只看该宏）" @click="debugTask(task)">
+                <AppIcon name="terminal" :size="13" />
+              </button>
+              <button
+                class="tool"
+                title="重启（卸载重载宏后重新拉起）"
+                @click="void restartTaskById(task.id)"
+              >
+                <AppIcon name="refresh" :size="13" />
+              </button>
               <button
                 v-if="task.status === 'running'"
                 class="tool danger"
                 title="停止任务"
-                @click="void stop(task)"
+                @click="void stopTaskById(task.id)"
               >
                 <AppIcon name="stop" :size="13" />
               </button>
@@ -239,8 +261,9 @@ async function stop(task: TaskEntry): Promise<void> {
   flex: none;
 }
 
-.task-toolbar select,
 .log-search {
+  flex: 1;
+  min-width: 0;
   background: var(--control);
   color: var(--text-1);
   border: 1px solid var(--border);
@@ -250,19 +273,13 @@ async function stop(task: TaskEntry): Promise<void> {
   outline: none;
 }
 
-.log-search {
-  flex: 1;
-  min-width: 0;
-}
-
-.task-toolbar .tool,
-.columns-anchor .tool {
+.task-toolbar .tool {
   background: transparent;
   border: none;
   color: var(--text-3);
   width: 24px;
   height: 24px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-md);
@@ -279,33 +296,10 @@ async function stop(task: TaskEntry): Promise<void> {
   background: var(--danger);
 }
 
-.columns-anchor {
-  position: relative;
-}
-
-.columns-pop {
-  position: absolute;
-  top: 30px;
-  right: 0;
-  z-index: 30;
-  background: var(--bg-chrome);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  padding: 8px;
+.columns-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px 14px;
-  white-space: nowrap;
-}
-
-.column-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-2);
-  cursor: pointer;
+  gap: 2px 14px;
 }
 
 .task-scroller {
@@ -410,7 +404,32 @@ async function stop(task: TaskEntry): Promise<void> {
 }
 
 .col-actions {
-  width: 32px;
+  width: 96px;
   text-align: center;
+  white-space: nowrap;
+}
+
+.col-actions .tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.col-actions .tool:hover {
+  color: var(--text-1);
+  background: var(--hover);
+}
+
+.col-actions .tool.danger:hover {
+  color: var(--on-danger);
+  background: var(--danger);
 }
 </style>

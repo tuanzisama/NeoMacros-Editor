@@ -13,7 +13,7 @@ import { buildTree } from '@/stores/filetree'
 import type { TreeNode } from '@/stores/filetree'
 import { notify } from '@/stores/workspace'
 import { KEYPRESS_EDGES, LIFECYCLE_LABELS } from '@/types/api'
-import type { EventCatalogEntry, Lifecycle, MacroView } from '@/types/api'
+import type { EventCatalogEntry, MacroView } from '@/types/api'
 import { ApiError } from '@/types/api'
 import {
   ensureConfigSection,
@@ -27,6 +27,7 @@ import {
 import { comboLabel, isModifierCode, modifiersOf, vanillaOf } from '@/utils/keynames'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppSelect, { type SelectOption } from '@/components/ui/AppSelect.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 
 const props = defineProps<{ macro: MacroView }>()
@@ -65,7 +66,7 @@ const catalog = ref<EventCatalogEntry[] | null>(null) // null = 目录不可用�
 
 /* ---- 服务宏 ---- */
 
-const serviceLifecycle = ref<Lifecycle>('always')
+const serviceLifecycle = ref<string>('always')
 const autostart = ref(false)
 
 /* ---- 入口文件树选择 ---- */
@@ -102,7 +103,7 @@ onMounted(async () => {
     eventName.value = declaredEvents.value[0] ?? ''
 
     const lc = readConfigString(originalLines, 'service', 'lifecycle')
-    if (lc && lc in LIFECYCLE_LABELS) serviceLifecycle.value = lc as Lifecycle
+    if (lc && lc in LIFECYCLE_LABELS) serviceLifecycle.value = lc
     autostart.value = readConfigString(originalLines, 'service', 'autostart') === 'true'
   } catch (e) {
     loadError.value = e instanceof Error ? e.message : String(e)
@@ -197,6 +198,26 @@ const groupedEvents = computed(() => {
   for (const bucket of groups.values()) bucket.sort((a, b) => a.name.localeCompare(b.name))
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]))
 })
+
+/* ---- AppSelect 选项 ---- */
+
+const EDGE_OPTIONS = computed<SelectOption[]>(() =>
+  KEYPRESS_EDGES.map((e) => ({ value: e, label: EDGE_LABELS[e] ?? e })),
+)
+
+const EVENT_OPTIONS = computed<SelectOption[]>(() =>
+  groupedEvents.value.flatMap(([domain, list]) =>
+    list.map((ev) => ({
+      value: ev.name,
+      label: ev.cancellable ? `${ev.name} · 可取消` : ev.name,
+      group: domain,
+    })),
+  ),
+)
+
+const LIFECYCLE_OPTIONS = computed<SelectOption[]>(() =>
+  Object.entries(LIFECYCLE_LABELS).map(([value, label]) => ({ value, label })),
+)
 
 /* ---- 入口树 ---- */
 
@@ -420,9 +441,7 @@ async function save(): Promise<void> {
         </div>
         <div class="field">
           <label>触发边沿</label>
-          <select v-model="edge">
-            <option v-for="e in KEYPRESS_EDGES" :key="e" :value="e">{{ EDGE_LABELS[e] }}</option>
-          </select>
+          <AppSelect v-model="edge" :options="EDGE_OPTIONS" />
           <span class="hint">keydown/keyup 为原始边沿（支持修饰键）；keypress 走原版键位绑定。</span>
         </div>
       </template>
@@ -431,14 +450,7 @@ async function save(): Promise<void> {
       <template v-else-if="macro.category === 'event'">
         <div class="field">
           <label>事件</label>
-          <select v-model="eventName">
-            <option value="" disabled>选择事件…</option>
-            <optgroup v-for="[domain, list] in groupedEvents" :key="domain" :label="domain">
-              <option v-for="ev in list" :key="ev.name" :value="ev.name">
-                {{ ev.name }}{{ ev.cancellable ? ' · 可取消' : '' }}
-              </option>
-            </optgroup>
-          </select>
+          <AppSelect v-model="eventName" :options="EVENT_OPTIONS" placeholder="选择事件…" />
           <span v-if="catalog === null" class="hint">事件目录不可用（mod 未提供 /api/v1/events/catalog）</span>
           <span v-else-if="declaredEvents.length > 1" class="hint">
             原清单声明 {{ declaredEvents.length }} 个事件，保存后仅保留所选。
@@ -450,11 +462,7 @@ async function save(): Promise<void> {
       <template v-else-if="macro.category === 'services'">
         <div class="field">
           <label>生命周期</label>
-          <select v-model="serviceLifecycle">
-            <option value="always">{{ LIFECYCLE_LABELS.always }}</option>
-            <option value="world">{{ LIFECYCLE_LABELS.world }}</option>
-            <option value="manual">{{ LIFECYCLE_LABELS.manual }}</option>
-          </select>
+          <AppSelect v-model="serviceLifecycle" :options="LIFECYCLE_OPTIONS" />
         </div>
         <div class="field row">
           <label>自启</label>

@@ -5,10 +5,13 @@
  */
 
 import { reactive, computed } from 'vue'
-import { getTasks, stopTask } from '@/api/endpoints'
+import { getTasks, stopTask, restartTask } from '@/api/endpoints'
 import { sse } from '@/api/sse'
+import { ApiError } from '@/types/api'
 import type { TaskEntry } from '@/types/api'
-import { notify } from './workspace'
+import { notify, workspace } from './workspace'
+import { mergedFilters } from './mergedConsole'
+import { resolveMacroId } from './console'
 
 const HISTORY_CAP = 500
 
@@ -16,7 +19,8 @@ interface TasksState {
   active: TaskEntry[]
   history: TaskEntry[]
   search: string
-  statusFilter: '' | 'running' | 'stopped'
+  /** 状态过滤：'' 全部 / running / stopped（AppSelect 直绑，取原值） */
+  statusFilter: string
   error: string
   /** 心跳时钟：驱动运行中任务的持续时间渲染 */
   now: number
@@ -91,6 +95,31 @@ export async function stopTaskById(id: number): Promise<void> {
   } catch (e) {
     notify(e instanceof Error ? e.message : String(e), 'error')
   }
+}
+
+/**
+ * 重启一条任务（卸载重载宏后重新拉起）。旧版 mod 无此端点（404）→ 提示未实现；
+ * 快照回包直接作为增量合并（与 stop 同口径）。
+ */
+export async function restartTaskById(id: number): Promise<void> {
+  try {
+    const res = await restartTask(id)
+    tasksStore.error = ''
+    for (const entry of [...res.active, ...res.history]) upsert(entry)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      notify('当前 mod 版本不支持任务重启（端点未实现）', 'warning')
+      return
+    }
+    notify(e instanceof Error ? e.message : String(e), 'error')
+  }
+}
+
+/** 调试：打开 DevTools 控制台并只看该任务宏的输出 */
+export function debugTask(task: TaskEntry): void {
+  workspace.bottomPanelOpen = true
+  workspace.devtoolsTab = 'console'
+  mergedFilters.macroFilter = resolveMacroId(task.macro)
 }
 
 let bound = false

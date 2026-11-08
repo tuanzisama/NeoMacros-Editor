@@ -15,14 +15,15 @@ import {
   isFailed,
   type DetailTab,
   type NetworkRow,
-  type StatusBucket,
 } from '@/stores/network'
 import { resolveMacroId } from '@/stores/console'
 import { getNetworkBody } from '@/api/endpoints'
 import { formatMs, formatBytes, networkTypeLabel, networkName } from './consoleFormat'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
-const STATUS_OPTIONS: { value: StatusBucket; label: string }[] = [
+const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: '全部' },
   { value: '2', label: '2xx 成功' },
   { value: '3', label: '3xx 重定向' },
@@ -274,11 +275,7 @@ function togglePause(): void {
 <template>
   <div class="network-tab">
     <div class="tab-toolbar">
-      <select v-model="network.statusFilter" class="net-select">
-        <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
+      <AppSelect v-model="network.statusFilter" :options="STATUS_OPTIONS" class="net-select" title="状态筛选" />
       <input
         v-model="network.search"
         class="log-search"
@@ -387,9 +384,7 @@ function togglePause(): void {
                 <button class="group-head" @click="showResponseHeaders = !showResponseHeaders">
                   <span class="caret" :class="{ closed: !showResponseHeaders }">▾</span> Response headers
                 </button>
-                <label class="raw-toggle">
-                  <input v-model="rawResponseHeaders" type="checkbox" /> Raw
-                </label>
+                <AppCheckbox v-model="rawResponseHeaders" label="Raw" class="raw-toggle" />
               </div>
               <template v-if="showResponseHeaders">
                 <pre v-if="rawResponseHeaders" class="raw-headers">{{ rawHeaders(selected.responseHeaders) || '（无响应标头）' }}</pre>
@@ -407,9 +402,7 @@ function togglePause(): void {
                 <button class="group-head" @click="showRequestHeaders = !showRequestHeaders">
                   <span class="caret" :class="{ closed: !showRequestHeaders }">▾</span> Request headers
                 </button>
-                <label class="raw-toggle">
-                  <input v-model="rawRequestHeaders" type="checkbox" /> Raw
-                </label>
+                <AppCheckbox v-model="rawRequestHeaders" label="Raw" class="raw-toggle" />
               </div>
               <template v-if="showRequestHeaders">
                 <pre v-if="rawRequestHeaders" class="raw-headers">{{ rawHeaders(selected.requestHeaders) || '（脚本未设置请求头）' }}</pre>

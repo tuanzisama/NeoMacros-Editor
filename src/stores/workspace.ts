@@ -1,8 +1,11 @@
 /**
- * 工作区 UI 状态：活动栏选择、侧栏/底部面板开关、主区特殊视图、状态栏反馈消息。
+ * 工作区 UI 状态：activity/mainSpecial 由路由派生（router/index.ts afterEach 同步），
+ * 侧栏/底部面板开合、DevTools 页签、状态栏反馈消息。导航函数（selectActivity 等）
+ * 保持原签名，内部走 router.push。
  */
 
 import { reactive } from 'vue'
+import { router } from '@/router'
 import { CATEGORY_LABELS } from '@/types/api'
 import type { MacroCategory, MacroView } from '@/types/api'
 
@@ -72,16 +75,15 @@ export function notify(text: string, kind: Feedback['kind'] = 'info'): void {
 
 export function selectActivity(activity: Activity): void {
   const prev = workspace.activity
-  workspace.activity = activity
   if (isCategory(activity)) {
     workspace.lastCategory = activity
-    workspace.mainSpecial = null
     // VS Code 行为：重复点击已激活分类 → 切换侧栏开合
     workspace.sidebarOpen = prev === activity ? !workspace.sidebarOpen : true
+    void router.push({ name: 'editor', params: { category: activity } })
   } else {
-    // settings / about：主区特殊视图
-    workspace.mainSpecial = activity
+    // settings / about / tasks：主区特殊视图
     workspace.sidebarOpen = true
+    void router.push({ name: activity })
   }
 }
 
@@ -95,7 +97,13 @@ export function backToExplorer(): void {
   selectActivity(workspace.lastCategory)
 }
 
-/** 打开文件标签时回到编辑器主区 */
-export function focusEditor(): void {
-  workspace.mainSpecial = null
+/** 打开文件标签时回到编辑器主区；macroId（category/name）用于定位分类侧栏 */
+export function focusEditor(macroId?: string): void {
+  const category = macroId ? (macroId.split('/')[0] as Activity) : workspace.lastCategory
+  if (isCategory(category)) {
+    workspace.lastCategory = category
+    void router.push({ name: 'editor', params: { category } })
+    return
+  }
+  void router.push({ name: 'editor', params: { category: workspace.lastCategory } })
 }

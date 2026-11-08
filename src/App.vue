@@ -1,23 +1,20 @@
 <script setup lang="ts">
 /**
- * 应用外壳：标题栏 / 活动栏 / 侧栏（资源管理器）/ 主区 / DevTools 面板 / 状态栏 + 全局模态。
+ * 应用外壳：标题栏 / 活动栏 / 侧栏（资源管理器）/ 主区（RouterView）/ DevTools 面板 / 状态栏 + 全局模态。
  * 启动编排（契约 §2）：query 深链（host+pair）→ meta 首探 → 自动配对 → 在线拉快照/日志/事件流。
+ * 页面切换走 vue-router（hash）；连接守卫在 router/index.ts，连接页是 /connect 路由。
  */
 
-import { computed, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import TitleBar from '@/components/shell/TitleBar.vue'
 import ActivityBar from '@/components/shell/ActivityBar.vue'
 import StatusBar from '@/components/shell/StatusBar.vue'
 import ReconnectBanner from '@/components/shell/ReconnectBanner.vue'
-import ConnectView from '@/components/connect/ConnectView.vue'
 import MacroSideBar from '@/components/explorer/MacroSideBar.vue'
-import EditorArea from '@/components/editor/EditorArea.vue'
 import NewMacroWizard from '@/components/editor/NewMacroWizard.vue'
 import DeleteConfirm from '@/components/editor/DeleteConfirm.vue'
 import DevToolsPanel from '@/components/devtools/DevToolsPanel.vue'
-import TaskManagerView from '@/components/tasks/TaskManagerView.vue'
-import SettingsView from '@/components/settings/SettingsView.vue'
-import AboutView from '@/components/settings/AboutView.vue'
 import {
   connection,
   connect,
@@ -41,6 +38,9 @@ import { startNetwork, stopNetwork, bindNetworkSse } from '@/stores/network'
 import { startTasks, stopTasks, bindTasksSse } from '@/stores/tasks'
 import { sse } from '@/api/sse'
 
+const route = useRoute()
+const router = useRouter()
+
 // SSE 事件绑定（幂等注册）
 bindMacroSse()
 bindEditorSse()
@@ -49,20 +49,13 @@ bindConsoleSse()
 bindNetworkSse()
 bindTasksSse()
 
+/** 侧栏只在编辑器路由出现（tasks/settings/about 主区无侧栏） */
+const onEditorRoute = computed(() => route.name === 'editor')
 const sidebarVisible = computed(
   () =>
     (connection.status === 'online' || connection.sessionEstablished) &&
     isCategory(workspace.activity) &&
     workspace.sidebarOpen,
-)
-const mainSpecial = computed(() => workspace.mainSpecial)
-/**
- * 连接页只在前置未就绪时出现（从未连接/主动断开/解除配对）。曾在线后的
- * 断线、重连、凭据失效都保持原界面，由顶部重连横幅接管提示，避免编辑
- * 中的内容被连接页整屏覆盖。
- */
-const showConnectView = computed(
-  () => connection.status !== 'online' && !connection.sessionEstablished,
 )
 
 /* ---- 侧栏拖拽调宽（220–520，双击复位，持久化于 settings） ---- */
@@ -160,7 +153,28 @@ onMounted(async () => {
 
   // query 深链总是伴随整页导航，boot 时消费一次即可
   await handleDeepLink(consumeDeepLink())
+  booted.value = true
+  // boot 结束仍未就绪（不可达/未配对/无凭据）→ 连接页接管（旧 showConnectView 口径）
+  if (connection.status !== 'online' && !connection.sessionEstablished && route.name !== 'connect') {
+    void router.push({ name: 'connect' })
+  }
 })
+
+/** boot 完成后：会话失效（主动断开/解除配对/凭据失效降级）→ 连接页接管 */
+const booted = ref(false)
+watch(
+  () => [connection.status, connection.sessionEstablished] as const,
+  ([status, established]) => {
+    if (!booted.value) return
+    if (status !== 'online' && !established && route.name !== 'connect') {
+      void router.push({ name: 'connect' })
+    }
+    // 恢复在线：从连接页回到编辑器（守卫只拦导航，状态变化需主动跳）
+    if (status === 'online' && route.name === 'connect') {
+      void router.push({ name: 'editor', params: { category: workspace.lastCategory } })
+    }
+  },
+)
 
 watch(
   () => connection.status,
@@ -182,22 +196,20 @@ watch(
     <ReconnectBanner />
     <div class="app-body">
       <ActivityBar />
-      <MacroSideBar v-if="sidebarVisible" />
-      <div
-        v-if="sidebarVisible"
-        class="sidebar-resizer"
-        title="拖拽调宽，双击复位"
-        @pointerdown="startResize"
-        @dblclick="resetSidebarWidth"
-      />
+      <template v-if="onEditorRoute">
+        <MacroSideBar v-if="sidebarVisible" />
+        <div
+          v-if="sidebarVisible"
+          class="sidebar-resizer"
+          title="拖拽调宽，双击复位"
+          @pointerdown="startResize"
+          @dblclick="resetSidebarWidth"
+        />
+      </template>
       <main class="main-area">
         <div class="main-stack">
           <div class="main-content">
-            <ConnectView v-if="showConnectView" />
-            <TaskManagerView v-else-if="mainSpecial === 'tasks'" />
-            <SettingsView v-else-if="mainSpecial === 'settings'" />
-            <AboutView v-else-if="mainSpecial === 'about'" />
-            <EditorArea v-else />
+            <RouterView />
           </div>
           <DevToolsPanel v-if="workspace.bottomPanelOpen" />
         </div>

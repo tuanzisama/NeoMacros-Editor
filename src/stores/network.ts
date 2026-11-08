@@ -30,7 +30,8 @@ interface NetworkState {
   paused: boolean
   /** 过滤：URL / 发起者 / 方法 / 错误 包含匹配 */
   search: string
-  statusFilter: StatusBucket
+  /** 状态筛选：'' 全部 / '2'..'5' 状态段 / 'failed' 失败（AppSelect 直绑，取原值） */
+  statusFilter: string
   /** 详情面板当前标签（切 DevTools 标签后保留） */
   detailTab: DetailTab
 }

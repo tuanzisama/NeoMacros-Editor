@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 设置页：连接（地址/本机设备/服务端设备）+ 编辑器 + 关于。 */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { connection, connect as apiConnect, forgetDevice } from '@/stores/connection'
 import { macros } from '@/stores/macros'
 import { settings, resetSettings } from '@/stores/settings'
@@ -9,12 +9,49 @@ import { notify, backToExplorer } from '@/stores/workspace'
 import { listDevices, revokeDevice } from '@/api/endpoints'
 import type { DeviceRecord } from '@/types/api'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
 
 const hostInput = ref(connection.host)
 const connecting = ref(false)
 
 const devices = ref<DeviceRecord[] | null>(null)
 const devicesError = ref('')
+
+/* AppSelect 以字符串为值：联合/数字型设置经 computed 桥接 */
+const theme = computed<string>({
+  get: () => settings.theme,
+  set: (v) => {
+    settings.theme = v as typeof settings.theme
+  },
+})
+const language = computed<string>({
+  get: () => settings.language,
+  set: (v) => {
+    settings.language = v as typeof settings.language
+  },
+})
+const tabSize = computed<string>({
+  get: () => String(settings.tabSize),
+  set: (v) => {
+    settings.tabSize = Number(v)
+  },
+})
+
+const THEME_OPTIONS = [
+  { value: 'dark', label: '深色' },
+  { value: 'light', label: '浅色' },
+  { value: 'auto', label: '跟随系统' },
+]
+const TAB_OPTIONS = [
+  { value: '2', label: '2' },
+  { value: '4', label: '4' },
+  { value: '8', label: '8' },
+]
+const LANGUAGE_OPTIONS = computed(() => [
+  { value: 'auto', label: '自动识别' },
+  ...MONACO_LOCALES.map((l) => ({ value: l, label: LOCALE_LABELS[l] })),
+])
 
 async function doConnect(): Promise<void> {
   connecting.value = true
@@ -143,49 +180,38 @@ function fmtUptime(ms: number): string {
       <section class="card">
         <h2>编辑器</h2>
         <div class="opt-row">
-          <label class="grow" for="set-theme">主题</label>
-          <select id="set-theme" v-model="settings.theme" class="num">
-            <option value="dark">深色</option>
-            <option value="light">浅色</option>
-            <option value="auto">跟随系统</option>
-          </select>
+          <label class="grow">主题</label>
+          <AppSelect v-model="theme" :options="THEME_OPTIONS" class="num" />
         </div>
         <div class="opt-row">
-          <label class="grow" for="set-lang">
+          <label class="grow">
             语言
             <span class="hint-inline">编辑器界面文案；刷新页面后生效</span>
           </label>
-          <select id="set-lang" v-model="settings.language" class="num">
-            <option value="auto">自动识别</option>
-            <option v-for="l in MONACO_LOCALES" :key="l" :value="l">{{ LOCALE_LABELS[l] }}</option>
-          </select>
+          <AppSelect v-model="language" :options="LANGUAGE_OPTIONS" class="num" />
         </div>
         <div class="opt-row">
-          <label class="grow" for="set-font">字号</label>
-          <input id="set-font" v-model.number="settings.fontSize" type="number" min="10" max="28" class="num" />
+          <label class="grow">字号</label>
+          <input v-model.number="settings.fontSize" type="number" min="10" max="28" class="num" />
         </div>
         <div class="opt-row">
-          <label class="grow" for="set-tab">缩进宽度</label>
-          <select id="set-tab" v-model.number="settings.tabSize" class="num">
-            <option :value="2">2</option>
-            <option :value="4">4</option>
-            <option :value="8">8</option>
-          </select>
+          <label class="grow">缩进宽度</label>
+          <AppSelect v-model="tabSize" :options="TAB_OPTIONS" class="num" />
         </div>
         <div class="opt-row">
-          <label class="grow" for="set-wrap">自动换行</label>
-          <input id="set-wrap" v-model="settings.wordWrap" type="checkbox" class="checkbox" />
+          <label class="grow">自动换行</label>
+          <AppCheckbox v-model="settings.wordWrap" />
         </div>
         <div class="opt-row">
-          <label class="grow" for="set-minimap">缩略图（minimap）</label>
-          <input id="set-minimap" v-model="settings.minimap" type="checkbox" class="checkbox" />
+          <label class="grow">缩略图（minimap）</label>
+          <AppCheckbox v-model="settings.minimap" />
         </div>
         <div class="opt-row">
-          <label class="grow" for="set-checkjs">
+          <label class="grow">
             JS 语义诊断（checkJs）
             <span class="hint-inline">语法错误恒开；开启后按 neomacros.d.ts 做类型检查</span>
           </label>
-          <input id="set-checkjs" v-model="settings.checkJs" type="checkbox" class="checkbox" />
+          <AppCheckbox v-model="settings.checkJs" />
         </div>
         <div class="opt-row">
           <span class="grow" />

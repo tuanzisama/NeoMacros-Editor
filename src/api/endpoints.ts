@@ -272,6 +272,15 @@ export async function stopTask(id: number): Promise<TasksResponse> {
   return res.json() as TasksResponse
 }
 
+/**
+ * 重启一条任务：卸载并重载宏后重新拉起。运行中=重启，已停止=按原参数重拉。
+ * mod 端待实现（docs/mod-api-pending.md §tasks-restart）；旧版 mod 404 由调用方提示未实现。
+ */
+export async function restartTask(id: number): Promise<TasksResponse> {
+  const res = await client.request('POST', `/api/v1/tasks/${id}/restart`)
+  return res.json() as TasksResponse
+}
+
 export async function eventsTicket(): Promise<TicketResponse> {
   const res = await client.request('POST', '/api/v1/events/ticket')
   return res.json() as TicketResponse

@@ -8,10 +8,12 @@
 import { reactive, ref } from 'vue'
 import { deleteFile, mkdirPath, moveFile, readFile, writeFile } from '@/api/endpoints'
 import { ApiError } from '@/types/api'
-import type { MacroView } from '@/types/api'
-import { ensureFiles, expandedIds, invalidateFiles } from './macros'
+import type { MacroView, TaskEntry } from '@/types/api'
+import { ensureFiles, expandedIds, invalidateFiles, macros } from './macros'
 import type { MacroFiles } from './macros'
 import { editor, closeTab, openFile } from './editor'
+import { notify, workspace } from './workspace'
+import { router } from '@/router'
 
 /* ---- 名称与格式 ---- */
 
@@ -351,3 +353,30 @@ export function buildTree(listing: MacroFiles): TreeNode[] {
 
 /** 配置对话框打开（由侧栏触发，对话框组件在侧栏内渲染） */
 export const configTarget = ref<MacroView | null>(null)
+
+/** 树选中高亮（跨路由跳转用，完整路径如 `keypress/foo/neomacro.yml`）；点击任意树行清除 */
+export const treeSelection = ref<string | null>(null)
+
+/** 树节点完整路径（侧栏与跳转共用口径：macroId/rel） */
+export function treePath(macroId: string, rel: string): string {
+  return `${macroId}/${rel}`
+}
+
+/**
+ * 任务管理器 → 宏配置：跳到分类编辑器路由，树中展开并高亮 neomacro.yml，
+ * 打开配置对话框。宏不在列表（加载失败/已删除）时提示且不跳转。
+ */
+export async function revealMacroConfig(task: TaskEntry): Promise<void> {
+  const macro =
+    macros.macros.find((m) => m.id === `${task.category}/${task.macro}`) ??
+    macros.macros.find((m) => m.name === task.macro && m.category === task.category)
+  if (!macro) {
+    notify(`宏 ${task.macro} 不在宏列表中（可能加载失败）`, 'warning')
+    return
+  }
+  expandedIds.add(macro.id)
+  treeSelection.value = treePath(macro.id, 'neomacro.yml')
+  configTarget.value = macro
+  workspace.sidebarOpen = true
+  await router.push({ name: 'editor', params: { category: macro.category } })
+}

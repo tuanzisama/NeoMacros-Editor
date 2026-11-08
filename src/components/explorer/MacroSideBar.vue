@@ -27,6 +27,7 @@ import {
   opAvailable,
   pasteInto,
   renameNode,
+  treeSelection,
 } from '@/stores/filetree'
 import type { TreeNode } from '@/stores/filetree'
 import { openFile, openMacro, editor } from '@/stores/editor'
@@ -177,6 +178,7 @@ const rows = computed<Row[]>(() => {
 })
 
 function toggleDir(macroId: string, rel: string): void {
+  clearTreeSelection()
   const k = dirKey(macroId, rel)
   if (expandedIds.has(k)) expandedIds.delete(k)
   else expandedIds.add(k)
@@ -198,20 +200,28 @@ function isActiveFile(m: MacroView, rel: string): boolean {
   return editor.activePath === filePath(m, rel)
 }
 
+/** 任何树点击都解除「任务跳转」高亮（避免高亮僵死） */
+function clearTreeSelection(): void {
+  if (treeSelection.value !== null) treeSelection.value = null
+}
+
 async function open(m: MacroView, rel: string): Promise<void> {
-  focusEditor()
+  clearTreeSelection()
+  focusEditor(m.id)
   await openFile(filePath(m, rel), m.id)
 }
 
 async function openEntry(m: MacroView): Promise<void> {
-  focusEditor()
+  clearTreeSelection()
+  focusEditor(m.id)
   await openMacro(m)
 }
 
 async function openErrorFile(m: MacroView): Promise<void> {
   if (!m.error) return
   const path = m.error.script.replace(/\\/g, '/')
-  focusEditor()
+  clearTreeSelection()
+  focusEditor(m.id)
   await openFile(path, m.id)
 }
 
@@ -569,7 +579,7 @@ async function onDrop(e: DragEvent, row: Row): Promise<void> {
               'drop-target': dragOverKey === rowKey(row),
             }"
             :title="rowTitle(row.macro)"
-            @click="toggleExpanded(row.macro.id)"
+            @click="clearTreeSelection(); toggleExpanded(row.macro.id)"
             @dblclick="openEntry(row.macro)"
             @contextmenu.prevent="openMenu($event, { kind: 'macro', macro: row.macro })"
             @dragover="onDragOver($event, row)"
@@ -708,7 +718,11 @@ async function onDrop(e: DragEvent, row: Row): Promise<void> {
           <div
             v-else
             class="file-row"
-            :class="{ selected: isActiveFile(row.macro, row.node.rel) }"
+            :class="{
+              selected:
+                isActiveFile(row.macro, row.node.rel) ||
+                treeSelection === filePath(row.macro, row.node.rel),
+            }"
             :style="{ paddingLeft: indentOf(row.depth) }"
             :title="filePath(row.macro, row.node.rel)"
             draggable="true"

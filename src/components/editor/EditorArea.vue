@@ -23,7 +23,8 @@ const closeCandidate = ref<EditorTab | null>(null)
 
 function switchTo(path: string): void {
   editor.activePath = path
-  focusEditor()
+  const tab = editor.tabs.find((t) => t.path === path)
+  focusEditor(tab?.macroId)
 }
 
 function requestClose(tab: EditorTab): void {

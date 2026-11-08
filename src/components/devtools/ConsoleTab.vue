@@ -25,6 +25,9 @@ import { formatArgs, countText, timerText, stringifyNode, type DisplaySeg } from
 import ConsoleMessage from './ConsoleMessage.vue'
 import ConsolePrompt from './ConsolePrompt.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppSelect, { type SelectOption } from '@/components/ui/AppSelect.vue'
+import AppCheckbox from '@/components/ui/AppCheckbox.vue'
+import AppPopover from '@/components/ui/AppPopover.vue'
 import type { ConsoleEntry } from '@/types/api'
 
 const scroller = ref<HTMLDivElement | null>(null)
@@ -57,29 +60,26 @@ onMounted(() => {
 const replTarget = ref('devtools')
 
 /** 宏下拉选项（完整 id，稳定排序） */
-const macroOptions = computed(() =>
-  macros.macros.map((m) => m.id).sort((a, b) => a.localeCompare(b)),
+const macroOptions = computed<SelectOption[]>(() =>
+  macros.macros
+    .map((m) => m.id)
+    .sort((a, b) => a.localeCompare(b))
+    .map((id) => ({ value: id, label: id })),
 )
 
 const BUCKETS: LevelBucket[] = ['verbose', 'info', 'warn', 'error']
 
-const levelsOpen = ref(false)
-const enabledBuckets = computed(() => BUCKETS.filter((b) => mergedFilters.buckets[b]))
-
-function toggleLevels(): void {
-  levelsOpen.value = !levelsOpen.value
-}
-
-function closeLevels(): void {
-  levelsOpen.value = false
-}
-
 /** 级别下拉按钮文案：全开 = 默认级别（Chrome 口径） */
-const levelsLabel = computed(() =>
-  enabledBuckets.value.length === BUCKETS.length
+const levelsLabel = computed(() => {
+  const enabled = BUCKETS.filter((b) => mergedFilters.buckets[b])
+  return enabled.length === BUCKETS.length
     ? '默认级别'
-    : enabledBuckets.value.map((b) => BUCKET_LABELS[b]).join('/') || '无级别',
-)
+    : enabled.map((b) => BUCKET_LABELS[b]).join('/') || '无级别'
+})
+
+function setBucket(bucket: LevelBucket, on: boolean): void {
+  mergedFilters.buckets[bucket] = on
+}
 
 // ---- 侧栏 ------------------------------------------------------------------
 
@@ -89,7 +89,8 @@ function selectBucket(bucket: LevelBucket | 'all'): void {
     for (const b of BUCKETS) mergedFilters.buckets[b] = true
     return
   }
-  const exclusive = enabledBuckets.value.length === BUCKETS.length || !mergedFilters.buckets[bucket]
+  const enabledCount = BUCKETS.filter((b) => mergedFilters.buckets[b]).length
+  const exclusive = enabledCount === BUCKETS.length || !mergedFilters.buckets[bucket]
   for (const b of BUCKETS) mergedFilters.buckets[b] = exclusive ? b === bucket : true
 }
 
@@ -209,27 +210,36 @@ function stringifyCell(node: ConsoleEntry['args'][number]): string {
 <template>
   <div class="console-tab">
     <div class="tab-toolbar">
-      <select v-model="replTarget" class="context-select" title="REPL 执行上下文">
-        <option value="devtools">devtools</option>
-        <option v-for="id in macroOptions" :key="id" :value="id">{{ id }}</option>
-      </select>
-      <select v-model="mergedFilters.macroFilter" class="macro-select" title="只看某个宏">
-        <option value="">全部宏</option>
-        <option v-for="id in macroOptions" :key="id" :value="id">{{ id }}</option>
-      </select>
-      <div class="levels-wrap">
-        <button class="levels-btn" :title="`启用级别：${levelsLabel}`" @click="toggleLevels"
-          @blur="closeLevels">
-          {{ levelsLabel }} <span class="caret">▾</span>
-        </button>
-        <div v-if="levelsOpen" class="levels-pop" @mousedown.prevent>
-          <label v-for="b in BUCKETS" :key="b" class="levels-row">
-            <input v-model="mergedFilters.buckets[b]" type="checkbox" />
-            <span>{{ BUCKET_LABELS[b] }}</span>
+      <AppSelect
+        v-model="replTarget"
+        :options="[{ value: 'devtools', label: 'devtools' }, ...macroOptions]"
+        class="context-select"
+        title="REPL 执行上下文"
+      />
+      <AppSelect
+        v-model="mergedFilters.macroFilter"
+        :options="[{ value: '', label: '全部宏' }, ...macroOptions]"
+        class="macro-select"
+        title="只看某个宏"
+      />
+      <AppPopover align="start">
+        <template #trigger>
+          <button class="levels-btn" :title="`启用级别：${levelsLabel}`">
+            {{ levelsLabel }} <span class="caret">▾</span>
+          </button>
+        </template>
+        <div class="levels-list">
+          <AppCheckbox
+            v-for="b in BUCKETS"
+            :key="b"
+            :model-value="mergedFilters.buckets[b]"
+            :label="BUCKET_LABELS[b]"
+            @update:model-value="setBucket(b, $event)"
+          >
             <span class="levels-count">{{ bucketCounts[b] }}</span>
-          </label>
+          </AppCheckbox>
         </div>
-      </div>
+      </AppPopover>
       <input v-model="mergedFilters.search" class="log-search" placeholder="过滤…" spellcheck="false" />
       <button
         class="tool"
@@ -379,16 +389,16 @@ function stringifyCell(node: ConsoleEntry['args'][number]): string {
   max-width: 180px;
 }
 
-.levels-wrap {
-  position: relative;
-}
-
 .levels-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: var(--radius-sm);
   color: var(--text-2);
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .levels-btn:hover {
@@ -401,32 +411,11 @@ function stringifyCell(node: ConsoleEntry['args'][number]): string {
   color: var(--text-3);
 }
 
-.levels-pop {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 30;
-  background: var(--bg-elevated);
-  border: 1px solid var(--divider);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  padding: 4px 6px;
-  min-width: 130px;
-}
-
-.levels-row {
+.levels-list {
   display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  padding: 3px 4px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  user-select: none;
-}
-
-.levels-row:hover {
-  background: var(--hover);
+  flex-direction: column;
+  gap: 1px;
+  min-width: 140px;
 }
 
 .levels-count {
