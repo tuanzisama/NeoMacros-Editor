@@ -1,11 +1,12 @@
 /**
- * 页面路由（hash 模式）：mod 静态托管无 SPA fallback，hash 免服务端配合；
- * 深链 ?host=&pair= 落在 hash 之前的 search 上，connection.consumeDeepLink 口径不变。
+ * 页面路由（HTML5 history 模式，Vercel 托管：vercel.json rewrites 全部落 index.html；
+ * mod 本机静态托管无 SPA fallback，刷新子路径会 404，深链入口恒为根路径不受影响）。
+ * 深链 ?host=&pair= 落在 search 上，connection.consumeDeepLink 口径不变。
  * 连接守卫：会话未建立（从未连接/主动断开/解除配对）一律先到 /connect；
  * 曾在线后的断线保持原路由（顶部横幅接管提示）；在线访问 /connect 跳回编辑器。
  */
 
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { connection, lastHost } from '@/stores/connection'
 import { workspace } from '@/stores/workspace'
 import type { MacroCategory } from '@/types/api'
@@ -23,7 +24,7 @@ const AboutView = (): Promise<typeof import('@/components/settings/AboutView.vue
   import('@/components/settings/AboutView.vue')
 
 export const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes: [
     { path: '/', redirect: () => ({ name: 'editor', params: { category: workspace.lastCategory } }) },
     { path: '/connect', name: 'connect', component: ConnectView },
