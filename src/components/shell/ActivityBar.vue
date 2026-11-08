@@ -22,6 +22,7 @@ const categories = computed(() =>
 
 const others = [
   { id: 'tasks', icon: 'tasks', label: '任务管理器' },
+  { id: 'memory', icon: 'memory', label: '内存' },
   { id: 'settings', icon: 'settings', label: '设置' },
   { id: 'about', icon: 'info', label: '关于' },
 ] as const

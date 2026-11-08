@@ -11,7 +11,8 @@ import AppIcon from '@/components/ui/AppIcon.vue'
       <h1>NeoMacros 面板</h1>
       <p class="sub">按键 / 事件 / 服务三类宏的网页版管理与 Monaco 脚本编辑器。</p>
       <div v-if="connection.meta" class="meta">
-        <span>mod v{{ connection.meta.modVersion }}</span>
+        <span>mod v{{ connection.meta.modVersion
+          }}<em v-if="connection.meta.channel" class="channel">{{ connection.meta.channel }}</em></span>
         <span>Minecraft {{ connection.meta.gameVersion }}</span>
         <span>Panel API v1</span>
       </div>
@@ -56,6 +57,16 @@ h1 {
 .sub {
   color: var(--text-2);
   margin: 0 0 16px;
+}
+
+.channel {
+  font-style: normal;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .meta {

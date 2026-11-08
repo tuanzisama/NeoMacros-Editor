@@ -13,8 +13,10 @@ import type {
   LogEntry,
   MacroStateEvent,
   MacrosChangedEvent,
+  MemorySample,
   NetworkEntry,
   TaskEntry,
+  UpdateAvailableEvent,
 } from '@/types/api'
 
 export type SseStatus = 'off' | 'connecting' | 'open' | 'reconnecting'
@@ -31,12 +33,14 @@ export class SseManager {
   private logHandlers = new Set<Handler<LogEntry>>()
   private consoleHandlers = new Set<Handler<ConsoleEntry>>()
   private networkHandlers = new Set<Handler<NetworkEntry>>()
+  private memoryHandlers = new Set<Handler<MemorySample>>()
   private macroStateHandlers = new Set<Handler<MacroStateEvent>>()
   private macrosChangedHandlers = new Set<Handler<MacrosChangedEvent>>()
   private taskStateHandlers = new Set<Handler<TaskEntry>>()
   private fileChangedHandlers = new Set<Handler<FileChangedEvent>>()
   private configChangedHandlers = new Set<Handler<ConfigChangedEvent>>()
   private pairingPendingHandlers = new Set<Handler<{ label: string }>>()
+  private updateHandlers = new Set<Handler<UpdateAvailableEvent>>()
   private shutdownHandlers = new Set<Handler<void>>()
   private deadHandlers = new Set<Handler<void>>()
   /** 连续取票失败次数（连上即清零）；达到阈值判「服务已死」，触发 onDead */
@@ -55,6 +59,11 @@ export class SseManager {
   onNetwork(fn: Handler<NetworkEntry>): () => void {
     this.networkHandlers.add(fn)
     return () => this.networkHandlers.delete(fn)
+  }
+
+  onMemory(fn: Handler<MemorySample>): () => void {
+    this.memoryHandlers.add(fn)
+    return () => this.memoryHandlers.delete(fn)
   }
 
   onMacroState(fn: Handler<MacroStateEvent>): () => void {
@@ -85,6 +94,11 @@ export class SseManager {
   onPairingPending(fn: Handler<{ label: string }>): () => void {
     this.pairingPendingHandlers.add(fn)
     return () => this.pairingPendingHandlers.delete(fn)
+  }
+
+  onUpdate(fn: Handler<UpdateAvailableEvent>): () => void {
+    this.updateHandlers.add(fn)
+    return () => this.updateHandlers.delete(fn)
   }
 
   onShutdown(fn: Handler<void>): () => void {
@@ -175,10 +189,12 @@ export class SseManager {
     source.addEventListener('macros:changed', (e) =>
       this.dispatch(this.macrosChangedHandlers, e.data),
     )
+    source.addEventListener('memory:sample', (e) => this.dispatch(this.memoryHandlers, e.data))
     source.addEventListener('task:state', (e) => this.dispatch(this.taskStateHandlers, e.data))
     source.addEventListener('file:changed', (e) => this.dispatch(this.fileChangedHandlers, e.data))
     source.addEventListener('config:changed', (e) => this.dispatch(this.configChangedHandlers, e.data))
     source.addEventListener('pairing:pending', (e) => this.dispatch(this.pairingPendingHandlers, e.data))
+    source.addEventListener('update:available', (e) => this.dispatch(this.updateHandlers, e.data))
     source.addEventListener('server:shutdown', () => {
       for (const fn of this.shutdownHandlers) fn()
       // 优雅停机：转重连态，持续探测直到服务回来

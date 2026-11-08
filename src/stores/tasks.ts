@@ -87,6 +87,17 @@ function upsert(entry: TaskEntry): void {
   }
 }
 
+/**
+ * 内存采样驱动的轻量更新：原地刷新任务内存列（memBytes），不触发
+ * task:state 全量合并。由 memory store 在每条采样到达时调用。
+ */
+export function updateTaskMemory(id: number, memBytes: number): void {
+  for (const list of [tasksStore.active, tasksStore.history]) {
+    const at = list.findIndex((t) => t.id === id)
+    if (at >= 0) list.splice(at, 1, { ...list[at], memBytes })
+  }
+}
+
 /** 停止一条任务；快照回包直接作为增量合并 */
 export async function stopTaskById(id: number): Promise<void> {
   try {

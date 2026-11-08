@@ -80,6 +80,8 @@ export interface Meta {
   api: number[]
   modVersion: string
   gameVersion: string
+  /** 构建渠道：release / dev / canary / local（旧版 mod 无此字段） */
+  channel?: string
 }
 
 export interface LogEntry {
@@ -260,11 +262,53 @@ export interface TaskEntry {
   /** Integrated 或服务器地址；未知为空 */
   server: string | null
   mcVersion: string | null
+  /**
+   * 最近一次采样的脚本线程累计分配字节数（增长/泄漏信号，非实时堆占用）。
+   * null = 未采样（旧 mod 或平台不支持逐线程计数器）。
+   */
+  memBytes: number | null
 }
 
 export interface TasksResponse {
   active: TaskEntry[]
   history: TaskEntry[]
+}
+
+/** W-memory 契约：JVM 堆快照（MemoryMXBean），字节数 */
+export interface JvmMemory {
+  used: number
+  committed: number
+  max: number
+}
+
+/** W-memory 契约：单脚本内存信号 */
+export interface ScriptMemory {
+  /** 所属任务 id；0 = 共享 DevTools 会话 */
+  taskId: number
+  /** manifest 名；共享会话为 "devtools" */
+  name: string
+  /** 分类目录名；共享会话为 "devtools" */
+  category: string
+  /** 脚本事件循环线程的累计分配字节数 */
+  bytes: number
+  /** 本条采样时刻 epoch 毫秒（逐脚本采样，可能略滞后于外层 ts） */
+  sampledAt: number
+}
+
+/** W-memory 契约：一条内存采样 */
+export interface MemorySample {
+  seq: number
+  ts: number
+  jvm: JvmMemory
+  /** scripts.bytes 之和（脚本线程累计分配合计） */
+  graaljsAllocated: number
+  /** 按任务 id 升序；无法读取的脚本省略 */
+  scripts: ScriptMemory[]
+}
+
+export interface MemoryResponse {
+  samples: MemorySample[]
+  lastSeq: number
 }
 
 /** W2 契约：新建宏脚手架 */
@@ -360,6 +404,7 @@ export type SseEventName =
   | 'config:changed'
   | 'file:changed'
   | 'pairing:pending'
+  | 'update:available'
   | 'server:shutdown'
 
 export interface MacroStateEvent {
@@ -382,4 +427,13 @@ export interface FileChangedEvent {
 export interface ConfigChangedEvent {
   key: string
   value: unknown
+}
+
+/** 有可用更新（mod 检查命中后广播；notes 可能缺省） */
+export interface UpdateAvailableEvent {
+  channel: string
+  current: string
+  latest: string
+  notes?: string
+  date?: string
 }

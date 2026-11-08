@@ -167,6 +167,8 @@ function fmtUptime(ms: number): string {
           <div class="kv">
             <span>mod 版本</span><span class="mono">{{ connection.meta.modVersion }}</span>
             <span>游戏版本</span><span class="mono">{{ connection.meta.gameVersion }}</span>
+            <span v-if="connection.meta.channel">渠道</span>
+            <span v-if="connection.meta.channel" class="mono">{{ connection.meta.channel }}</span>
             <span>API</span><span class="mono">v{{ connection.meta.api.join(' · v') }}</span>
             <template v-if="macros.server">
               <span>监听</span><span class="mono">{{ macros.server.listen }} :{{ macros.server.port }}</span>

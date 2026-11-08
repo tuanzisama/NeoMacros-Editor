@@ -20,6 +20,7 @@ import type {
   MacroAction,
   MacroCategory,
   MacroView,
+  MemoryResponse,
   Meta,
   NetworkResponse,
   StateSnapshot,
@@ -251,6 +252,19 @@ export async function evalConsole(req: ConsoleEvalRequest): Promise<ConsoleRespo
     body: JSON.stringify(req),
   })
   return res.json() as ConsoleResponse
+}
+
+/** 内存采样环形回放。旧版 mod 无此端点：404 时静默回退为空。 */
+export async function getMemory(after: number): Promise<MemoryResponse> {
+  try {
+    const res = await client.request('GET', '/api/v1/memory', { query: { after } })
+    return res.json() as MemoryResponse
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      return { samples: [], lastSeq: after }
+    }
+    throw e
+  }
 }
 
 /** 任务管理器快照（活动 + 历史）。旧版 mod 无此端点：404 时静默回退为空。 */

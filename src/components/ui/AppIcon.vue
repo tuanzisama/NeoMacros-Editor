@@ -16,6 +16,8 @@ const paths: Record<string, string> = {
   play: 'M8 5.1v13.8L19 12 8 5.1z',
   pause: 'M6 5h4v14H6V5zm8 0h4v14h-4V5z',
   stop: 'M6 6h12v12H6V6z',
+  memory:
+    'M3 4h18v13H3V4zm2 2v9h14V6H5zm1.5 11h11v2h-11v-2zM7 8h2.2l1.3 3.2L11.8 8H14l1.5 7h-2.1l-.8-3.9L11.3 15h-1.6l-1.3-3.9-.8 3.9H5.5L7 8z',
   refresh:
     'M12 4a8 8 0 0 1 7.4 5H22l-3.8 4.5L14.5 9h2.9A6 6 0 1 0 18 12h2a8 8 0 1 1-8-8zm-7.4 11H2l3.8-4.5L9.5 15H6.6A6 6 0 0 0 12 18v2a8 8 0 0 1-7.4-5H4.6z',
   trash:

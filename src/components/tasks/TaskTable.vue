@@ -12,6 +12,7 @@ import { openMacro } from '@/stores/editor'
 import { revealMacroConfig } from '@/stores/filetree'
 import { focusEditor, notify } from '@/stores/workspace'
 import { settings } from '@/stores/settings'
+import { formatBytes } from '@/components/devtools/consoleFormat'
 import { CATEGORY_LABELS } from '@/types/api'
 import type { TaskEntry } from '@/types/api'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -29,6 +30,7 @@ const COLUMNS = [
   { id: 'startedAt', label: '创建时间' },
   { id: 'duration', label: '持续时间' },
   { id: 'triggers', label: '触发次数' },
+  { id: 'mem', label: '内存' },
   { id: 'file', label: '宏文件' },
   { id: 'player', label: '玩家' },
   { id: 'gameType', label: '游戏类型' },
@@ -82,6 +84,12 @@ function timeText(ts: number): string {
     d.getDate() === today.getDate()
   const hms = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
   return sameDay ? hms : `${d.getMonth() + 1}/${d.getDate()} ${hms}`
+}
+
+/** 内存列悬停提示：口径说明（脚本线程累计分配，增长/泄漏信号） */
+function memTitle(task: TaskEntry): string {
+  if (task.memBytes == null) return '未采样（编辑器未连接或平台不支持逐线程计数器）'
+  return `脚本线程累计分配 ${formatBytes(task.memBytes)}（增长/泄漏信号，非实时堆占用）`
 }
 
 const STARTED_BY_LABELS: Record<string, string> = {
@@ -188,6 +196,12 @@ async function openTaskMacro(task: TaskEntry): Promise<void> {
               </template>
               <template v-else-if="col === 'triggers'">
                 {{ task.triggers }}
+              </template>
+              <template v-else-if="col === 'mem'">
+                <span
+                  class="mem mono"
+                  :title="memTitle(task)"
+                >{{ task.memBytes == null ? '—' : formatBytes(task.memBytes) }}</span>
               </template>
               <template v-else-if="col === 'file'">
                 <button

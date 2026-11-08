@@ -11,6 +11,7 @@ import TitleBar from '@/components/shell/TitleBar.vue'
 import ActivityBar from '@/components/shell/ActivityBar.vue'
 import StatusBar from '@/components/shell/StatusBar.vue'
 import ReconnectBanner from '@/components/shell/ReconnectBanner.vue'
+import UpdateBanner from '@/components/shell/UpdateBanner.vue'
 import MacroSideBar from '@/components/explorer/MacroSideBar.vue'
 import NewMacroWizard from '@/components/editor/NewMacroWizard.vue'
 import DeleteConfirm from '@/components/editor/DeleteConfirm.vue'
@@ -35,7 +36,9 @@ import {
   bindConsoleSse,
 } from '@/stores/console'
 import { startNetwork, stopNetwork, bindNetworkSse } from '@/stores/network'
+import { startMemory, stopMemory, bindMemorySse } from '@/stores/memory'
 import { startTasks, stopTasks, bindTasksSse } from '@/stores/tasks'
+import { bindUpdateSse } from '@/stores/updates'
 import { sse } from '@/api/sse'
 
 const route = useRoute()
@@ -47,7 +50,9 @@ bindEditorSse()
 bindLogSse()
 bindConsoleSse()
 bindNetworkSse()
+bindMemorySse()
 bindTasksSse()
+bindUpdateSse()
 
 /** 侧栏只在编辑器路由出现（tasks/settings/about 主区无侧栏） */
 const onEditorRoute = computed(() => route.name === 'editor')
@@ -101,6 +106,7 @@ async function onOnline(): Promise<void> {
   startLogs()
   startConsole()
   startNetwork()
+  startMemory()
   startTasks()
 }
 
@@ -184,6 +190,7 @@ watch(
       stopLogs()
       stopConsole()
       stopNetwork()
+      stopMemory()
       stopTasks()
     }
   },
@@ -194,6 +201,7 @@ watch(
   <div class="app-shell">
     <TitleBar />
     <ReconnectBanner />
+    <UpdateBanner />
     <div class="app-body">
       <ActivityBar />
       <template v-if="onEditorRoute">

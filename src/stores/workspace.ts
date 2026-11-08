@@ -9,9 +9,9 @@ import { router } from '@/router'
 import { CATEGORY_LABELS } from '@/types/api'
 import type { MacroCategory, MacroView } from '@/types/api'
 
-/** 活动 = 宏分类（资源管理器三入口）+ 任务/设置/关于；DevTools 入口在状态栏，不经活动栏 */
-export type Activity = MacroCategory | 'tasks' | 'settings' | 'about'
-export type MainSpecial = null | 'tasks' | 'settings' | 'about'
+/** 活动 = 宏分类（资源管理器三入口）+ 任务/内存/设置/关于；DevTools 入口在状态栏，不经活动栏 */
+export type Activity = MacroCategory | 'tasks' | 'memory' | 'settings' | 'about'
+export type MainSpecial = null | 'tasks' | 'memory' | 'settings' | 'about'
 
 export function isCategory(a: Activity): a is MacroCategory {
   return a in CATEGORY_LABELS

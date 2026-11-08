@@ -18,6 +18,8 @@ const EditorArea = (): Promise<typeof import('@/components/editor/EditorArea.vue
   import('@/components/editor/EditorArea.vue')
 const TaskManagerView = (): Promise<typeof import('@/components/tasks/TaskManagerView.vue')> =>
   import('@/components/tasks/TaskManagerView.vue')
+const MemoryManagerView = (): Promise<typeof import('@/components/memory/MemoryManagerView.vue')> =>
+  import('@/components/memory/MemoryManagerView.vue')
 const SettingsView = (): Promise<typeof import('@/components/settings/SettingsView.vue')> =>
   import('@/components/settings/SettingsView.vue')
 const AboutView = (): Promise<typeof import('@/components/settings/AboutView.vue')> =>
@@ -35,6 +37,7 @@ export const router = createRouter({
       component: EditorArea,
     },
     { path: '/tasks', name: 'tasks', component: TaskManagerView },
+    { path: '/memory', name: 'memory', component: MemoryManagerView },
     { path: '/settings', name: 'settings', component: SettingsView },
     { path: '/about', name: 'about', component: AboutView },
     { path: '/:pathMatch(.*)*', redirect: '/' },
@@ -63,7 +66,7 @@ router.afterEach((to) => {
     workspace.activity = category
     workspace.lastCategory = category
     workspace.mainSpecial = null
-  } else if (to.name === 'tasks' || to.name === 'settings' || to.name === 'about') {
+  } else if (to.name === 'tasks' || to.name === 'memory' || to.name === 'settings' || to.name === 'about') {
     workspace.activity = to.name
     workspace.mainSpecial = to.name
   }
