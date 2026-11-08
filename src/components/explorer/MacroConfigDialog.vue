@@ -52,7 +52,7 @@ const main = ref('')
 
 /* ---- 按键宏：键位录入 + 触发边沿 ---- */
 
-const keyValue = ref<string | null>(null) // 原版键名（config.keypress.default-key）
+const keyValue = ref<string | null>(null) // 原版键名（config.keypress.key_code）
 const keyMods = ref<string[]>([]) // 清单 modifiers 段（ctrl/shift/alt）
 const edge = ref('keypress')
 const capturing = ref(false)
@@ -96,7 +96,7 @@ onMounted(async () => {
 
     const on = readConfigString(originalLines, 'keypress', 'on')
     edge.value = on && (KEYPRESS_EDGES as readonly string[]).includes(on) ? on : 'keypress'
-    keyValue.value = readConfigString(originalLines, 'keypress', 'default-key') || null
+    keyValue.value = readConfigString(originalLines, 'keypress', 'key_code') || null
     keyMods.value = readConfigList(originalLines, 'keypress', 'modifiers') ?? []
 
     declaredEvents.value = readConfigList(originalLines, 'event', 'on') ?? []
@@ -308,7 +308,7 @@ async function save(): Promise<void> {
     setTopString(lines, 'main', main.value.trim())
     if (props.macro.category === 'keypress') {
       setConfigField(lines, 'keypress', 'on', edge.value)
-      setConfigField(lines, 'keypress', 'default-key', keyValue.value)
+      setConfigField(lines, 'keypress', 'key_code', keyValue.value)
       setConfigField(lines, 'keypress', 'modifiers', keyMods.value.length > 0 ? keyMods.value : null)
       pruneEmptyConfig(lines)
       ensureConfigSection(lines, 'keypress') // keypress 宏的必备块，键位清空后也不能剪

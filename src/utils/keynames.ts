@@ -1,7 +1,7 @@
 /**
  * 浏览器 KeyboardEvent.code ↔ 原版键名（Minecraft InputConstants 口径，
  * 如 `key.keyboard.x`）双向映射 + 组合键展示。
- * 名称对齐 26.3 InputConstants$Type 常量表；面板按键录入（config.keypress.default-key）用。
+ * 名称对齐 26.3 InputConstants$Type 常量表；面板按键录入（config.keypress.key_code）用。
  */
 
 const CODE_TO_VANILLA: Record<string, string> = {
