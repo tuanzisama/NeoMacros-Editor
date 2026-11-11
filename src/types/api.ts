@@ -27,7 +27,11 @@ export type KeypressEdge = (typeof KEYPRESS_EDGES)[number]
 /** 一条可订阅事件（GET /api/v1/events/catalog 条目；EventDescriptor 投影） */
 export interface EventCatalogEntry {
   name: string
+  /** 流向：c2s=上行拦截 / s2c=下行显示拦截 / local=本地状态观测 */
+  direction?: 'c2s' | 's2c' | 'local'
   cancellable: boolean
+  /** 同步通道（events.onSync）可改写的载荷字段 */
+  mutable?: string[]
 }
 
 export interface EventCatalog {
