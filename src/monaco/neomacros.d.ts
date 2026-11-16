@@ -4,7 +4,15 @@
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 /** Referenced in signatures but not yet documented with @ApiClass; opaque until annotated. */
+type BiConsumer = object;
+type Click = object;
+type ImageOptions = object;
+type ItemOptions = object;
+type LineOptions = object;
+type RectOptions = object;
 type SyncOptions = object;
+type TextOptions = object;
+type Tick = object;
 
 /** The neo.chat module: chat output services. Sending targets the connected server; log and actionbar render locally only. Text-taking members accept a TextComponent | string: components render with their full styling where the surface supports it, strings render plain. */
 interface ChatApi {
@@ -22,38 +30,66 @@ interface ChatApi {
     toast(title?: TextComponent | string, message?: TextComponent | string): void;
 }
 
-/** The neo.client module: process-level facts about the running game client, window and input surfaces, the connection lifecycle, and read-only registry and option slices. */
+/** The neo.client module: process-level facts about the running game client, window and input surfaces, the connection lifecycle, the registry queries, and the game-options handle with its write actions. */
 interface ClientApi {
+    /** Every registered block as its default state, sorted by identifier. @since 0.5.0 @mc * */
+    readonly blocks: Array<BlockState>;
     /** The current system clipboard text. @since 0.2.0 @mc * */
     readonly clipboard: string;
     /** Whether the game runs in a development environment. @since 0.2.0 @mc * */
     readonly devEnv: boolean;
+    /** The connected server's enchantment identifiers, sorted; empty without a connection (enchantments are data-driven and live on the connection, not in the built-in registries). @since 0.5.0 @mc * */
+    readonly enchantmentIds: Array<string>;
+    /** The world-generation feature identifiers, sorted; the registry name moved between nodes (worldgen/feature before 26.3, worldgen/feature_type from 26.3 on) and the port follows the active node. @since 0.5.0 @mc * */
+    readonly featureIds: Array<string>;
     /** The current frames-per-second measurement of the client. @since 0.2.0 @mc * */
     readonly fps: number;
     /** The game version string the client runs on. @since 0.2.0 @mc * */
     readonly gameVersion: string;
+    /** Every registered item as a default stack, sorted by identifier. @since 0.5.0 @mc * */
+    readonly items: Array<ItemStack>;
     /** The raw host client instance as a JavaObject proxy. Requires the java permission; equivalent to java.type('net.minecraft.client.Minecraft').getInstance(). @since 0.2.0 @mc * @requires permission 'java' */
     minecraft: JavaObject;
-    /** The installed mods as [{id, name, version, authors}] in loader order. @since 0.2.0 @mc * */
-    readonly mods: Array<ModData>;
+    /** The installed mods as [{id, name, version, authors, description, env, dependencies}] in loader order. @since 0.2.0 @mc * */
+    readonly mods: Array<ModInfoData>;
     /** The cursor position in window pixels as {x, y}. @since 0.2.0 @mc * */
     readonly mouse: MousePos;
-    /** A small read-only slice of the game options as {fov, gamma, guiScale, renderDistance}. @since 0.2.0 @mc * */
-    readonly options: OptionsData;
+    /** The live game-options root handle: video, skin, music, control, chat and accessibility groups plus the resource-pack, language, difficulty, camera and window controls. Every read re-queries the client port; writes resolve once the stored value has been read back. @since 0.5.0 @mc * */
+    options: Options;
+    /** Every namespaced packet id the client can encode, sorted; empty when the packet face is unavailable. @since 0.5.0 @mc * */
+    readonly packetIds: Array<string>;
+    /** The connected server's painting variant identifiers, sorted; empty without a connection (paintings are data-driven). @since 0.5.0 @mc * */
+    readonly paintingIds: Array<string>;
     /** The server-reported latency for the local player in milliseconds, or null without a connection. @since 0.2.0 @mc * */
     readonly ping: number;
     /** The connected server entry as {name, address, ping}, or null in singleplayer. @since 0.2.0 @mc * */
     readonly serverInfo: ServerInfoData;
+    /** Every registered status effect wrapped at zero duration (the same shape as ), sorted by identifier. @since 0.5.0 @mc * */
+    readonly statusEffects: Array<StatusEffectInfoData>;
     /** The window metrics as {width, height, scaledWidth, scaledHeight}. @since 0.2.0 @mc * */
     readonly window: WindowData;
     /** Connects to the server at the address, leaving any current world. Resolves once the connection is initiated; failures reject. @since 0.2.0 @mc * */
     connect(address: string): Promise<void>;
+    /** A fresh empty packet buffer builder; also reachable as new neo.PacketBuffer(). Buffers built here decode and send through the play phase unless told otherwise. @since 0.5.0 @mc * */
+    createPacketBuffer(): PacketBuffer;
     /** Disconnects from the current server. Resolves once initiated; rejects in singleplayer. @since 0.2.0 @mc * */
     disconnect(): Promise<void>;
     /** Closes the game immediately, skipping save and shutdown hooks. @since 0.2.0 @mc * */
     forceShutdown(): void;
-    /** The metadata of one loaded mod as {id, name, version, authors}, or null when not loaded. @since 0.2.0 @mc * */
-    getMod(id: string): ModData;
+    /** The default state of one registered block, e.g. oak_stairs; unknown identifiers read undefined. The block face shares : the NeoMacros Block handle is position-bound, so registry lookups answer with the default state (G-017 / G-027 口径). @since 0.5.0 @mc * */
+    getBlock(id: string): BlockState;
+    /** One block state of the given block: the default state when props is omitted, otherwise parsed from vanilla command property syntax (e.g. [facing=north]). Unknown identifiers read undefined; malformed property syntax rejects. @since 0.5.0 @mc * */
+    getBlockState(id: string, props?: string): BlockState;
+    /** One enchantment handle from the connected server's registry, carrying level (unclamped; 0 when omitted). Unknown identifiers and a missing connection read undefined. @since 0.5.0 @mc * */
+    getEnchantment(id: string, level?: number): Enchantment;
+    /** The default stack of one registered item, e.g. stone or minecraft:stone; unknown identifiers read undefined. The item face shares : NeoMacros has no separate item-type handle. @since 0.5.0 @mc * */
+    getItem(id: string): ItemStack;
+    /** One item stack of the given item: the default instance when components is omitted, otherwise parsed from vanilla item command syntax (e.g. [damage=12]). Unknown identifiers read undefined; malformed component syntax rejects; component parsing needs a connection and reads undefined without one. @since 0.5.0 @mc * */
+    getItemStack(id: string, components?: string): ItemStack;
+    /** The metadata of one loaded mod as {id, name, version, authors, description, env, dependencies}, or null when not loaded. @since 0.2.0 @mc * */
+    getMod(id: string): ModInfoData;
+    /** One registered status effect wrapped at zero duration, carrying the instance counters (id, duration, amplifier, infinite, ambient, showIcon, visible) and the type facts (instant, beneficial, neutral, harmful); unknown identifiers read undefined. @since 0.5.0 @mc * */
+    getStatusEffect(id: string): StatusEffectInfoData;
     /** Grabs the mouse cursor back into the game window. @since 0.2.0 @mc * */
     grabMouse(): void;
     /** Captures the game framebuffer as an Image; the promise resolves after the next frame read. @since 0.2.0 @mc * */
@@ -64,16 +100,202 @@ interface ClientApi {
     loadWorld(name: string): Promise<void>;
     /** One game option value by name (fov, sensitivity, particles, ...); the value is a Boolean, a number, or a lowercase enum name. Unknown names return null. @since 0.2.0 @mc * */
     option(name: string): boolean | number | string;
+    /** One normalized namespaced identifier without a registry lookup; the minecraft namespace is filled in when missing and malformed identifier syntax rejects. NeoMacros answers the plain string form instead of the host identifier object (escape layer: java). @since 0.5.0 @mc * */
+    parseIdentifier(id: string): string;
+    /** The identifier with the minecraft namespace filled in when the input carries no colon; the input passes through unchanged otherwise. @since 0.5.0 @mc * */
+    parseNameSpace(id: string): string;
     /** The identifiers of one built-in registry kind, e.g. block, item, enchantment, worldgen/biome; any registry id resolves, unknown kinds throw. @since 0.2.0 @mc * */
     registryIds(kind: string): Array<string>;
     /** Returns the full identifier when the registry kind contains the id (missing namespace defaults to minecraft), or null. @since 0.2.0 @mc * */
     registryLookup(kind: string, id: string): string;
     /** Releases the mouse cursor to the operating system. @since 0.2.0 @mc * */
     releaseMouse(): void;
+    /** Sends one raw packet object on the client's connection; the send still passes through packet:send. Requires the java capability (the argument itself is a raw host object). @since 0.5.0 @mc * @requires permission 'java' */
+    sendPacket(packet: unknown): JavaObject;
     /** Writes text to the system clipboard. @since 0.2.0 @mc * */
     setClipboard(value: string): void;
     /** Closes the game gracefully. @since 0.2.0 @mc * */
     shutdown(): void;
+}
+
+/** Accessibility settings group. */
+interface AccessibilityOptions {
+    /** Whether auto-jump is enabled. @since 0.5.0 @mc * */
+    readonly autoJump: boolean;
+    /** Whether text backgrounds render behind chat only. @since 0.5.0 @mc * */
+    readonly backgroundForChatOnly: boolean;
+    /** The delay before a chat message appears, in seconds. @since 0.5.0 @mc * */
+    readonly chatDelay: number;
+    /** The spacing between chat lines. @since 0.5.0 @mc * */
+    readonly chatLineSpacing: number;
+    /** The chat background opacity. @since 0.5.0 @mc * */
+    readonly chatOpacity: number;
+    /** Whether the dark Mojang Studios background is used. @since 0.5.0 @mc * */
+    readonly darkMojangStudiosBackground: boolean;
+    /** The screen distortion effect scale. @since 0.5.0 @mc * */
+    readonly distortionEffect: number;
+    /** The field-of-view effect scale. @since 0.5.0 @mc * */
+    readonly fovEffect: number;
+    /** Whether lightning flashes are hidden. @since 0.5.0 @mc * */
+    readonly hideLightningFlash: boolean;
+    /** The narrator mode: off, chat, system or all. @since 0.5.0 @mc * */
+    readonly narrator: string;
+    /** The options root that owns this group. @since 0.5.0 @mc * */
+    readonly parent: Options;
+    /** Whether subtitle captions are shown. @since 0.5.0 @mc * */
+    readonly showSubtitles: boolean;
+    /** The text background opacity. @since 0.5.0 @mc * */
+    readonly textBackgroundOpacity: number;
+    /** Whether sneak uses toggle behaviour. @since 0.5.0 @mc * */
+    readonly toggleCrouch: boolean;
+    /** Whether sprint uses toggle behaviour. @since 0.5.0 @mc * */
+    readonly toggleSprint: boolean;
+    /** Enables or disables auto-jump. @since 0.5.0 @mc * */
+    setAutoJump(value: boolean): Promise<void>;
+    /** Restricts text backgrounds to chat or lets them render everywhere. @since 0.5.0 @mc * */
+    setBackgroundForChatOnly(value: boolean): Promise<void>;
+    /** Sets the chat message delay in seconds; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatDelay(value: number): Promise<void>;
+    /** Sets the spacing between chat lines; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatLineSpacing(value: number): Promise<void>;
+    /** Sets the chat background opacity; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatOpacity(value: number): Promise<void>;
+    /** Enables or disables the dark Mojang Studios background. @since 0.5.0 @mc * */
+    setDarkMojangStudiosBackground(value: boolean): Promise<void>;
+    /** Sets the screen distortion effect scale; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setDistortionEffect(value: number): Promise<void>;
+    /** Sets the field-of-view effect scale; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setFovEffect(value: number): Promise<void>;
+    /** Sets the narrator mode; unknown modes reject. @since 0.5.0 @mc * */
+    setNarrator(mode: string): Promise<void>;
+    /** Shows or hides subtitle captions. @since 0.5.0 @mc * */
+    setShowSubtitles(value: boolean): Promise<void>;
+    /** Sets the text background opacity; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setTextBackgroundOpacity(value: number): Promise<void>;
+    /** Switches sneak between hold and toggle behaviour. @since 0.5.0 @mc * */
+    setToggleCrouch(value: boolean): Promise<void>;
+    /** Switches sprint between hold and toggle behaviour. @since 0.5.0 @mc * */
+    setToggleSprint(value: boolean): Promise<void>;
+}
+
+/** Chat display and behavior settings group. */
+interface ChatOptions {
+    /** Whether command suggestions appear while typing in chat. @since 0.5.0 @mc * */
+    readonly autoSuggestions: boolean;
+    /** Whether chat colors are shown. @since 0.5.0 @mc * */
+    readonly chatColors: boolean;
+    /** The delay before a chat message appears, in seconds. @since 0.5.0 @mc * */
+    readonly chatDelay: number;
+    /** The chat height scale while chat is focused. @since 0.5.0 @mc * */
+    readonly chatHeightFocused: number;
+    /** The chat height scale while chat is unfocused. @since 0.5.0 @mc * */
+    readonly chatHeightUnfocused: number;
+    /** The spacing between chat lines. @since 0.5.0 @mc * */
+    readonly chatLineSpacing: number;
+    /** Whether web links in chat can be opened. @since 0.5.0 @mc * */
+    readonly chatLinks: boolean;
+    /** Whether opening a chat web link asks for confirmation first. @since 0.5.0 @mc * */
+    readonly chatLinksPrompt: boolean;
+    /** The chat background opacity. @since 0.5.0 @mc * */
+    readonly chatOpacity: number;
+    /** The chat text scale. @since 0.5.0 @mc * */
+    readonly chatScale: number;
+    /** The chat visibility: full, system or hidden. @since 0.5.0 @mc * */
+    readonly chatVisibility: string;
+    /** The chat width scale. @since 0.5.0 @mc * */
+    readonly chatWidth: number;
+    /** Whether messages from blocked players are hidden. @since 0.5.0 @mc * */
+    readonly hideMatchedNames: boolean;
+    /** The narrator mode: off, chat, system or all. @since 0.5.0 @mc * */
+    readonly narrator: string;
+    /** The options root that owns this group. @since 0.5.0 @mc * */
+    readonly parent: Options;
+    /** Whether the debug overlay is reduced. @since 0.5.0 @mc * */
+    readonly reducedDebugInfo: boolean;
+    /** The text background opacity. @since 0.5.0 @mc * */
+    readonly textBackgroundOpacity: number;
+    /** Enables or disables command suggestions while typing. @since 0.5.0 @mc * */
+    setAutoSuggestions(value: boolean): Promise<void>;
+    /** Shows or hides chat colors. @since 0.5.0 @mc * */
+    setChatColors(value: boolean): Promise<void>;
+    /** Sets the chat message delay in seconds; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatDelay(value: number): Promise<void>;
+    /** Sets the chat height scale while chat is focused; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatHeightFocused(value: number): Promise<void>;
+    /** Sets the chat height scale while chat is unfocused; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatHeightUnfocused(value: number): Promise<void>;
+    /** Sets the spacing between chat lines; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatLineSpacing(value: number): Promise<void>;
+    /** Enables or disables opening web links from chat. @since 0.5.0 @mc * */
+    setChatLinks(value: boolean): Promise<void>;
+    /** Enables or disables the confirmation prompt before a chat link opens. @since 0.5.0 @mc * */
+    setChatLinksPrompt(value: boolean): Promise<void>;
+    /** Sets the chat background opacity; rejects when the stored value differs (out-of-range input). @since 0.5.0 @mc * */
+    setChatOpacity(value: number): Promise<void>;
+    /** Sets the chat text scale; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatScale(value: number): Promise<void>;
+    /** Sets the chat visibility; unknown modes reject. @since 0.5.0 @mc * */
+    setChatVisibility(mode: string): Promise<void>;
+    /** Sets the chat width scale; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setChatWidth(value: number): Promise<void>;
+    /** Enables or hides messages from blocked players. @since 0.5.0 @mc * */
+    setHideMatchedNames(value: boolean): Promise<void>;
+    /** Sets the narrator mode; unknown modes reject. @since 0.5.0 @mc * */
+    setNarrator(mode: string): Promise<void>;
+    /** Enables or disables reduced debug information. @since 0.5.0 @mc * */
+    setReducedDebugInfo(value: boolean): Promise<void>;
+    /** Sets the text background opacity; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setTextBackgroundOpacity(value: number): Promise<void>;
+}
+
+/** Input and key-binding settings group. */
+interface ControlOptions {
+    /** Whether auto-jump is enabled. @since 0.5.0 @mc * */
+    readonly autoJump: boolean;
+    /** The distinct key-mapping category keys in first-seen order. @since 0.5.0 @mc * */
+    readonly categories: Array<string>;
+    /** Whether the mouse wheel scrolls in discrete steps. @since 0.5.0 @mc * */
+    readonly discreteMouseScroll: boolean;
+    /** Whether the vertical mouse axis is inverted. @since 0.5.0 @mc * */
+    readonly invertMouseY: boolean;
+    /** The key binds grouped by category: category key to {bind name, key label}. @since 0.5.0 @mc * */
+    readonly keyBindsByCategory: Record<string, Record<string, string>>;
+    /** The key-mapping names in registration order. @since 0.5.0 @mc * */
+    readonly keys: Array<string>;
+    /** The mouse wheel sensitivity. @since 0.5.0 @mc * */
+    readonly mouseWheelSensitivity: number;
+    /** The options root that owns this group. @since 0.5.0 @mc * */
+    readonly parent: Options;
+    /** Whether raw mouse input is on; always true from Minecraft 26.3, where the setting was removed in favour of the SDL relative mouse mode. @since 0.5.0 @mc * */
+    readonly rawMouseInput: boolean;
+    /** The mouse sensitivity. @since 0.5.0 @mc * */
+    readonly sensitivity: number;
+    /** Whether sneak uses toggle behaviour. @since 0.5.0 @mc * */
+    readonly toggleCrouch: boolean;
+    /** Whether sprint uses toggle behaviour. @since 0.5.0 @mc * */
+    readonly toggleSprint: boolean;
+    /** Whether touchscreen mode is on; always false from Minecraft 26.2, where the setting was removed. @since 0.5.0 @mc * */
+    readonly touchscreen: boolean;
+    /** The key binds of one category as {bind name, key label}, or undefined when the category is unknown. @since 0.5.0 @mc * */
+    getKeyBindsByCategory(category: string): Record<string, string>;
+    /** Enables or disables auto-jump. @since 0.5.0 @mc * */
+    setAutoJump(value: boolean): Promise<void>;
+    /** Enables or disables discrete mouse scrolling. @since 0.5.0 @mc * */
+    setDiscreteMouseScroll(value: boolean): Promise<void>;
+    /** Enables or disables vertical mouse inversion. @since 0.5.0 @mc * */
+    setInvertMouseY(value: boolean): Promise<void>;
+    /** Sets the mouse wheel sensitivity; rejects when the stored value differs. @since 0.5.0 @mc * */
+    setMouseWheelSensitivity(value: number): Promise<void>;
+    /** Enables or disables raw mouse input. The setting was removed in Minecraft 26.3: the write has no effect there and resolves only when the requested value already matches the stored one. @since 0.5.0 @mc * */
+    setRawMouseInput(value: boolean): Promise<void>;
+    /** Sets the mouse sensitivity; rejects when the stored value differs (out-of-range input). @since 0.5.0 @mc * */
+    setSensitivity(value: number): Promise<void>;
+    /** Switches sneak between hold and toggle behaviour. @since 0.5.0 @mc * */
+    setToggleCrouch(value: boolean): Promise<void>;
+    /** Switches sprint between hold and toggle behaviour. @since 0.5.0 @mc * */
+    setToggleSprint(value: boolean): Promise<void>;
+    /** Enables or disables touchscreen mode. The setting was removed in Minecraft 26.2 with no replacement: the write has no effect there and resolves only when the requested value already matches the stored one. @since 0.5.0 @mc * */
+    setTouchscreen(value: boolean): Promise<void>;
 }
 
 /** The cursor position in window pixels. */
@@ -84,24 +306,300 @@ interface MousePos {
     readonly y: number;
 }
 
-interface ModData {
+/** Sound volume and audio device settings group. Reads re-query the client on every access; writes resolve after read-back. */
+interface MusicOptions {
+    /** The ambient sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly ambientVolume: number;
+    /** The available audio-device identifiers, starting with the system default. @since 0.5.0 @mc * */
+    readonly audioDevices: Array<string>;
+    /** The block sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly blockVolume: number;
+    /** The hostile-mob sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly hostileVolume: number;
+    /** The master sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly masterVolume: number;
+    /** The music sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly musicVolume: number;
+    /** The neutral-mob sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly neutralVolume: number;
+    /** The options root that owns this group. @since 0.5.0 @mc * */
+    readonly parent: Options;
+    /** The player sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly playerVolume: number;
+    /** The record (jukebox) sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly recordVolume: number;
+    /** Whether subtitle captions are shown. @since 0.5.0 @mc * */
+    readonly showSubtitles: boolean;
+    /** The selected audio-device identifier; empty string for the system default. @since 0.5.0 @mc * */
+    readonly soundDevice: string;
+    /** The interface sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly uiVolume: number;
+    /** The voice sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly voiceVolume: number;
+    /** Every sound-category volume keyed by category name; empty without options. @since 0.5.0 @mc * */
+    readonly volumes: Record<string, number>;
+    /** The weather sound-category volume (0..1). @since 0.5.0 @mc * */
+    readonly weatherVolume: number;
+    /** Sets the ambient sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setAmbientVolume(value: number): Promise<void>;
+    /** Sets the block sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setBlockVolume(value: number): Promise<void>;
+    /** Sets the hostile-mob sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setHostileVolume(value: number): Promise<void>;
+    /** Sets the master sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setMasterVolume(value: number): Promise<void>;
+    /** Sets the music sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setMusicVolume(value: number): Promise<void>;
+    /** Sets the neutral-mob sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setNeutralVolume(value: number): Promise<void>;
+    /** Sets the player sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setPlayerVolume(value: number): Promise<void>;
+    /** Sets the record (jukebox) sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setRecordVolume(value: number): Promise<void>;
+    /** Shows or hides subtitle captions. @since 0.5.0 @mc * */
+    setShowSubtitles(value: boolean): Promise<void>;
+    /** Selects an audio device; an identifier that is not currently available rejects without touching the stored selection. @since 0.5.0 @mc * */
+    setSoundDevice(device: string): Promise<void>;
+    /** Sets the interface sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setUiVolume(value: number): Promise<void>;
+    /** Sets the voice sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setVoiceVolume(value: number): Promise<void>;
+    /** Sets the weather sound-category volume; rejects when the client stores a different value (a level outside 0..1). @since 0.5.0 @mc * */
+    setWeatherVolume(value: number): Promise<void>;
+}
+
+/** The live game-options root handle. The read face keeps the historical fov, gamma, guiScale and renderDistance slice at the root; the full surface lives on and . */
+interface Options {
+    /** The accessibility settings group. @since 0.5.0 @mc * */
+    readonly accessibility: AccessibilityOptions;
+    /** The camera mode: 0 first person, 1 third person behind, 2 third person front. @since 0.5.0 @mc * */
+    readonly cameraMode: number;
+    /** The chat display and behavior settings group. @since 0.5.0 @mc * */
+    readonly chat: ChatOptions;
+    /** The input and key-binding settings group. @since 0.5.0 @mc * */
+    readonly control: ControlOptions;
+    /** Whether the world difficulty is locked; undefined without a world. @since 0.5.0 @mc * */
+    readonly difficultyLocked: boolean;
+    /** The enabled resource-pack identifiers, including required packs. @since 0.5.0 @mc * */
+    readonly enabledResourcePacks: Array<string>;
+    /** The field of view in degrees; undefined when options are unavailable. @since 0.5.0 @mc * */
+    readonly fov: number;
+    /** The brightness (gamma) level; an alias of video.gamma. @since 0.5.0 @mc * */
+    readonly gamma: number;
+    /** The configured GUI scale factor; an alias of video.guiScale. @since 0.5.0 @mc * */
+    readonly guiScale: number;
+    /** The window height in screen pixels. @since 0.5.0 @mc * */
+    readonly height: number;
+    /** The selected language code. @since 0.5.0 @mc * */
+    readonly language: string;
+    /** The sound volume and audio device settings group. @since 0.5.0 @mc * */
+    readonly music: MusicOptions;
+    /** The render distance in chunks; an alias of video.renderDistance. @since 0.5.0 @mc * */
+    readonly renderDistance: number;
+    /** The available resource-pack identifiers. @since 0.5.0 @mc * */
+    readonly resourcePacks: Array<string>;
+    /** The skin model-part and main-hand settings group. @since 0.5.0 @mc * */
+    readonly skin: SkinOptions;
+    /** Whether the smooth-camera toggle is enabled. @since 0.5.0 @mc * */
+    readonly smoothCamera: boolean;
+    /** The graphics and video settings group. @since 0.5.0 @mc * */
+    readonly video: VideoOptions;
+    /** The window width in screen pixels. @since 0.5.0 @mc * */
+    readonly width: number;
+    /** Asks the server to lock the world difficulty. The promise settles once the request is sent; the server decides whether it applies. @since 0.5.0 @mc * */
+    lockDifficulty(): Promise<void>;
+    /** Rejects or allows server-provided resource packs and reloads resources when the policy changes. @since 0.5.0 @mc * */
+    removeServerResourcePack(state: boolean): Promise<void>;
+    /** Persists the current settings to disk. @since 0.5.0 @mc * */
+    saveOptions(): Promise<void>;
+    /** Broadcasts the current synchronized options to the server; call it after writes that other players should observe. @since 0.5.0 @mc * */
+    sendSyncedOptions(): void;
+    /** Sets the camera mode; rejects when the mode is out of range or the stored value differs. @since 0.5.0 @mc * */
+    setCameraMode(mode: number): Promise<void>;
+    /** Selects the resource packs to enable and reloads resources when the selection changes. The promise rejects when the stored selection does not match the request (unknown identifiers or required packs the list omits). @since 0.5.0 @mc * */
+    setEnabledResourcePacks(enabled: Array<string>): Promise<void>;
+    /** Sets the field of view; rejects when the client stores a different value (out-of-range input). @since 0.5.0 @mc * */
+    setFov(fov: number): Promise<void>;
+    /** Resizes the window height, keeping the current width; rejects while fullscreen. @since 0.5.0 @mc * */
+    setHeight(h: number): Promise<void>;
+    /** Selects the language when its code is known and reloads resources; unknown codes reject. @since 0.5.0 @mc * */
+    setLanguage(languageCode: string): Promise<void>;
+    /** Resizes the window; rejects while fullscreen or for non-positive sizes. @since 0.5.0 @mc * */
+    setSize(w: number, h: number): Promise<void>;
+    /** Enables or disables the smooth-camera toggle. @since 0.5.0 @mc * */
+    setSmoothCamera(enabled: boolean): Promise<void>;
+    /** Resizes the window width, keeping the current height; rejects while fullscreen. @since 0.5.0 @mc * */
+    setWidth(w: number): Promise<void>;
+    /** Asks the server to unlock the world difficulty. The promise settles once the request is sent; the server decides whether it applies. @since 0.5.0 @mc * */
+    unlockDifficulty(): Promise<void>;
+}
+
+/** Skin model-part visibility and main-hand settings group. Reads re-query the client on every access; writes resolve after read-back. */
+interface SkinOptions {
+    /** Whether the cape model part is shown. @since 0.5.0 @mc * */
+    readonly cape: boolean;
+    /** Whether the hat model part is shown. @since 0.5.0 @mc * */
+    readonly hat: boolean;
+    /** Whether the jacket model part is shown. @since 0.5.0 @mc * */
+    readonly jacket: boolean;
+    /** Whether the left hand is the main hand; undefined without options. @since 0.5.0 @mc * */
+    readonly leftHanded: boolean;
+    /** Whether the left pant-leg model part is shown. @since 0.5.0 @mc * */
+    readonly leftPantsLeg: boolean;
+    /** Whether the left sleeve model part is shown. @since 0.5.0 @mc * */
+    readonly leftSleeve: boolean;
+    /** The main hand: left or right. @since 0.5.0 @mc * */
+    readonly mainHand: string;
+    /** The options root that owns this group. @since 0.5.0 @mc * */
+    readonly parent: Options;
+    /** Whether the right hand is the main hand; undefined without options. @since 0.5.0 @mc * */
+    readonly rightHanded: boolean;
+    /** Whether the right pant-leg model part is shown. @since 0.5.0 @mc * */
+    readonly rightPantsLeg: boolean;
+    /** Whether the right sleeve model part is shown. @since 0.5.0 @mc * */
+    readonly rightSleeve: boolean;
+    /** Shows or hides the cape model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setCape(value: boolean): Promise<void>;
+    /** Shows or hides the hat model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setHat(value: boolean): Promise<void>;
+    /** Shows or hides the jacket model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setJacket(value: boolean): Promise<void>;
+    /** Shows or hides the left pant-leg model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setLeftPantsLeg(value: boolean): Promise<void>;
+    /** Shows or hides the left sleeve model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setLeftSleeve(value: boolean): Promise<void>;
+    /** Selects the main hand; an unknown hand name rejects. @since 0.5.0 @mc * */
+    setMainHand(hand: string): Promise<void>;
+    /** Shows or hides the right pant-leg model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setRightPantsLeg(value: boolean): Promise<void>;
+    /** Shows or hides the right sleeve model part. The change takes effect on the running client at once; persist it with options.saveOptions(). @since 0.5.0 @mc * */
+    setRightSleeve(value: boolean): Promise<void>;
+}
+
+/** Video and graphics settings view over the option face. Reads re-query the client on every access; writes resolve after read-back. */
+interface VideoOptions {
+    /** Whether ambient occlusion (smooth lighting) is enabled. @since 0.5.0 @mc * */
+    readonly ambientOcclusion: boolean;
+    /** The attack indicator mode: off, crosshair or hotbar. @since 0.5.0 @mc * */
+    readonly attackIndicator: string;
+    /** The biome blend radius in blocks. @since 0.5.0 @mc * */
+    readonly biomeBlendRadius: number;
+    /** Whether view bobbing is enabled. @since 0.5.0 @mc * */
+    readonly bobView: boolean;
+    /** The brightness level; an alias of . @since 0.5.0 @mc * */
+    readonly brightness: number;
+    /** The cloud rendering mode: off, fast or fancy. @since 0.5.0 @mc * */
+    readonly cloudStatus: string;
+    /** Whether vertical sync is enabled. @since 0.5.0 @mc * */
+    readonly enableVsync: boolean;
+    /** The entity distance scaling factor. @since 0.5.0 @mc * */
+    readonly entityDistanceScaling: number;
+    /** Whether entity shadows are enabled. @since 0.5.0 @mc * */
+    readonly entityShadows: boolean;
+    /** The field-of-view effect scale. @since 0.5.0 @mc * */
+    readonly fovEffectScale: number;
+    /** The upper frame-rate limit. @since 0.5.0 @mc * */
+    readonly framerateLimit: number;
+    /** Whether the game runs in fullscreen. @since 0.5.0 @mc * */
+    readonly fullscreen: boolean;
+    /** The configured fullscreen video mode string; undefined when none is set. @since 0.5.0 @mc * */
+    readonly fullscreenResolution: string;
+    /** The brightness (gamma) level. @since 0.5.0 @mc * */
+    readonly gamma: number;
+    /** The graphics preset: fast, fancy or fabulous (and custom on newer versions). @since 0.5.0 @mc * */
+    readonly graphicsMode: string;
+    /** The configured GUI scale factor; the game may pick another effective scale. @since 0.5.0 @mc * */
+    readonly guiScale: number;
+    /** The mip-map level count. @since 0.5.0 @mc * */
+    readonly mipmapLevels: number;
+    /** The options root that owns this group. @since 0.5.0 @mc * */
+    readonly parent: Options;
+    /** The particle rendering mode: minimal, decreased or all. @since 0.5.0 @mc * */
+    readonly particles: string;
+    /** The chunk builder mode: none, nearby or player_affected. @since 0.5.0 @mc * */
+    readonly prioritizeChunkUpdates: string;
+    /** The render distance in chunks. @since 0.5.0 @mc * */
+    readonly renderDistance: number;
+    /** The screen distortion effect scale. @since 0.5.0 @mc * */
+    readonly screenEffectScale: number;
+    /** Whether the autosave indicator is shown. @since 0.5.0 @mc * */
+    readonly showAutosaveIndicator: boolean;
+    /** The simulation distance in chunks. @since 0.5.0 @mc * */
+    readonly simulationDistance: number;
+    /** Enables or disables ambient occlusion. @since 0.5.0 @mc * */
+    setAmbientOcclusion(mode: boolean): Promise<void>;
+    /** Sets the attack indicator mode, case-insensitively; rejects on unknown names or when the stored value differs. @since 0.5.0 @mc * */
+    setAttackIndicator(type: string): Promise<void>;
+    /** Sets the biome blend radius; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setBiomeBlendRadius(radius: number): Promise<void>;
+    /** Enables or disables view bobbing. @since 0.5.0 @mc * */
+    setBobView(val: boolean): Promise<void>;
+    /** Sets the brightness level; an alias of . @since 0.5.0 @mc * */
+    setBrightness(gamma: number): Promise<void>;
+    /** Sets the cloud rendering mode, case-insensitively; rejects on unknown names or when the stored value differs. @since 0.5.0 @mc * */
+    setCloudStatus(mode: string): Promise<void>;
+    /** Enables or disables vertical sync. @since 0.5.0 @mc * */
+    setEnableVsync(val: boolean): Promise<void>;
+    /** Sets the entity distance scaling factor; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setEntityDistanceScaling(val: number): Promise<void>;
+    /** Enables or disables entity shadows. @since 0.5.0 @mc * */
+    setEntityShadows(val: boolean): Promise<void>;
+    /** Sets the field-of-view effect scale; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setFovEffectScale(val: number): Promise<void>;
+    /** Sets the upper frame-rate limit; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setFramerateLimit(maxFps: number): Promise<void>;
+    /** Enters or leaves fullscreen mode. @since 0.5.0 @mc * */
+    setFullscreen(fullscreen: boolean): Promise<void>;
+    /** Sets the brightness (gamma) level; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setGamma(gamma: number): Promise<void>;
+    /** Sets the graphics preset by name, case-insensitively; rejects on unknown names or when the stored value differs. @since 0.5.0 @mc * */
+    setGraphicsMode(mode: string): Promise<void>;
+    /** Sets the GUI scale factor and resizes the interface; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setGuiScale(scale: number): Promise<void>;
+    /** Sets the mip-map level count; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setMipmapLevels(val: number): Promise<void>;
+    /** Sets the particle rendering mode, case-insensitively; rejects on unknown names or when the stored value differs. @since 0.5.0 @mc * */
+    setParticles(mode: string): Promise<void>;
+    /** Sets the chunk builder mode, case-insensitively; rejects on unknown names or when the stored value differs. @since 0.5.0 @mc * */
+    setPrioritizeChunkUpdates(mode: string): Promise<void>;
+    /** Sets the render distance; rejects when the client stores a different value (out-of-range input). @since 0.5.0 @mc * */
+    setRenderDistance(radius: number): Promise<void>;
+    /** Sets the screen distortion effect scale; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setScreenEffectScale(val: number): Promise<void>;
+    /** Shows or hides the autosave indicator. @since 0.5.0 @mc * */
+    setShowAutosaveIndicator(val: boolean): Promise<void>;
+    /** Sets the simulation distance; rejects when the client stores a different value. @since 0.5.0 @mc * */
+    setSimulationDistance(radius: number): Promise<void>;
+}
+
+interface ModInfoData {
     authors: Array<string>;
+    dependencies: Array<string>;
+    description: string;
+    env: string;
     id: string;
     name: string;
     version: string;
-}
-
-interface OptionsData {
-    fov: number;
-    gamma: number;
-    guiScale: number;
-    renderDistance: number;
 }
 
 interface ServerInfoData {
     address: string;
     name: string;
     ping: number;
+}
+
+interface StatusEffectInfoData {
+    ambient: boolean;
+    amplifier: number;
+    beneficial: boolean;
+    duration: number;
+    harmful: boolean;
+    id: string;
+    infinite: boolean;
+    instant: boolean;
+    neutral: boolean;
+    showIcon: boolean;
+    visible: boolean;
 }
 
 interface WindowData {
@@ -111,16 +609,20 @@ interface WindowData {
     width: number;
 }
 
-/** The neo.command module: client command registration and dispatch. Commands register declaratively with typed argument slots built through command.arg (int() float() bool() word() string() greedy() player() pos() plus optional() and default(v)); the handler receives a context whose args carry parsed values and whose raw keeps the remainder string. */
+/** The neo.command module: client command registration and dispatch. Commands register declaratively with typed argument slots built through command.arg (int() long() float() bool() word() string() greedy() player() pos() uuid() identifier() time() literal() plus optional(), default(v) and the numeric range(min, max)); the handler receives a context whose args carry parsed values and whose raw keeps the remainder string. This declarative surface is the single home of command building; no parallel builder grows here. */
 interface CommandApi {
     /** The typed argument-slot factory (command.arg). @since 0.1.0 @mc * */
-    readonly arg: Record<"int" | "float" | "bool" | "word" | "string" | "greedy" | "player" | "pos", () => CommandArg>;
+    readonly arg: Record<"int" | "long" | "float" | "bool" | "word" | "string" | "greedy" | "player" | "pos" | "uuid" | "identifier" | "time" | "literal", () => CommandArg>;
+    /** The names of every command in the client-visible command tree: server commands plus client-side registrations, read as a snapshot. Empty before a session opens. @since 0.5.0 @mc * */
+    readonly names: string[];
     /** Kind names the slot factory answers to (kept for tests and docs). @since 0.1.0 @mc * */
     argKindNames(): Array<string>;
     /** Executes a client command as if typed by the player; dispatches through the vanilla dispatcher on the main thread. The promise settles with whether the command was found and executed. @since 0.1.0 @mc * @requires permission 'command' */
     execute(commandLine: string): Promise<boolean>;
     /** Registers a client command. The spec map carries name, description, optional args slots and the handler receiving the parsed context. @since 0.1.0 @mc * @requires permission 'command' */
     register(spec: CommandSpec): string;
+    /** Completes one partial command line against the live command tree and resolves with the suggestion texts a player would see on tab. The leading slash is optional; without a connection the promise resolves to an empty list. @since 0.5.0 @mc * */
+    suggestions(commandPart: string): Promise<string[]>;
     /** Unregisters by the command name returned from . @since 0.1.0 @mc * */
     unregister(handleOrName: string): void;
 }
@@ -139,8 +641,10 @@ interface CommandSpec {
 
 /** The neo.entity module: entity queries over the loaded world. Queries return live handles whose getters read current state in real time; a vanished entity reads back as undefined instead of raising. */
 interface EntityApi {
-    /** Returns handles of every entity within range blocks of the center point. @since 0.1.0 @mc * */
-    inRadius(x: number, y: number, z: number, range: number): Array<Entity>;
+    /** Returns handles of every entity inside the axis-aligned box spanned by min and max, optionally filtered by entity type ids. @since 0.5.0 @mc * */
+    inBox(options: EntityInBoxOptions): Array<Entity>;
+    /** Returns handles of every entity within range blocks of the center point, optionally filtered by entity type ids. @since 0.1.0 @mc * */
+    inRadius(x: number, y: number, z: number, range: number, types?: string | Array<string>): Array<Entity>;
     /** Looks up a live entity handle by its UUID; undefined when absent or unloaded. @since 0.1.0 @mc * */
     lookup(uuid: string): Entity;
     /** Returns the nearest entity, or undefined when none matches. @since 0.1.0 @mc * */
@@ -159,6 +663,8 @@ interface BoundingBox {
 
 /** Live entity handle: getters re-query the world on every access; a vanished entity reads back as undefined instead of raising. */
 interface Entity {
+    /** The remaining air in ticks (300 max in vanilla water); undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly air: number;
     /** Whether the entity is loaded and alive (living entities must hold positive health). @since 0.2.0 @mc * */
     alive: boolean;
     /** The block-grid position (floored); undefined once the entity is gone. @since 0.2.0 @mc * */
@@ -167,6 +673,10 @@ interface Entity {
     readonly boundingBox: BoundingBox;
     /** The chunk coordinate containing this entity; undefined once the entity is gone. @since 0.2.0 @mc * */
     readonly chunk: ChunkPos;
+    /** The custom name shown above the entity, or undefined when the entity carries none or is gone. @since 0.5.0 @mc * */
+    readonly customName: string;
+    /** Whether the custom name is always shown, ignoring distance; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly customNameVisible: boolean;
     /** The dimension identifier the entity lives in; undefined once the entity is gone. @since 0.2.0 @mc * */
     readonly dimension: string;
     /** The view direction unit vector; undefined once the entity is gone. @since 0.2.0 @mc * */
@@ -179,10 +689,16 @@ interface Entity {
     readonly facing: string;
     /** Whether the entity is gliding with an elytra. @since 0.2.0 @mc * */
     gliding: boolean;
+    /** The packed RGB colour the glow outline is drawn in (the team colour when nothing overrides it); undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly glowColor: number;
+    /** Whether the entity currently carries a glow outline; re-read on every access, undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly glowing: boolean;
     /** Whether the entity is in lava. @since 0.2.0 @mc * */
     inLava: boolean;
     /** Whether the entity is in water. @since 0.2.0 @mc * */
     inWater: boolean;
+    /** The maximum air in ticks (300 in vanilla); undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly maxAir: number;
     /** The display name; undefined once the entity is gone. @since 0.1.0 @mc * */
     readonly name: string;
     /** Whether the entity is on fire. @since 0.2.0 @mc * */
@@ -203,6 +719,8 @@ interface Entity {
     readonly rotation: Pos2D;
     /** Whether the entity is sneaking. @since 0.2.0 @mc * */
     sneaking: boolean;
+    /** The horizontal movement since the previous tick, scaled to blocks per second; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly speed: number;
     /** Whether the entity is sprinting. @since 0.2.0 @mc * */
     sprinting: boolean;
     /** Whether the entity is swimming. @since 0.2.0 @mc * */
@@ -221,10 +739,32 @@ interface Entity {
     readonly yaw: number;
     /** The distance to another entity or point. @since 0.1.0 @mc * */
     distanceTo(target: Entity | Pos3D): number;
+    /** Restores the game's own glow decision after . Local write. @since 0.5.0 @mc * */
+    resetGlowing(): Promise<void>;
+    /** Restores the team-derived glow colour after . Local write. @since 0.5.0 @mc * */
+    resetGlowingColor(): Promise<void>;
+    /** Sets the custom name shown above the entity; an omitted or null name clears it. Local write: the server owns the real value and may overwrite it on the next sync. @since 0.5.0 @mc * */
+    setCustomName(name?: string | null): Promise<void>;
+    /** Sets whether the custom name is always shown above the entity, ignoring distance. Local write. @since 0.5.0 @mc * */
+    setCustomNameVisible(visible: boolean): Promise<void>;
+    /** Forces the glow outline on or off, overriding the game's own decision; restores it. Local write: a later server sync may take the decision back. @since 0.5.0 @mc * */
+    setGlowing(glowing: boolean): Promise<void>;
+    /** Draws the glow outline in the packed RGB colour, leaving whether the entity glows untouched; restores the team-derived colour. Local write. @since 0.5.0 @mc * */
+    setGlowingColor(color: number): Promise<void>;
     /** Returns a point-in-time snapshot copy, or null when the entity is gone. @since 0.1.0 @mc * */
     snapshot(): EntitySnapshot;
     /** JSON string of the point-in-time snapshot; JSON.stringify renders the handle through it. @since 0.3.0 @mc * */
     toJSON(): string;
+}
+
+/** One entity.inBox query: the box corner positions and an optional entity type filter. */
+interface EntityInBoxOptions {
+    /** max @since 0.5.0 @mc * */
+    readonly max: { x: number; y: number; z: number };
+    /** min @since 0.5.0 @mc * */
+    readonly min: { x: number; y: number; z: number };
+    /** types @since 0.5.0 @mc * */
+    readonly types: string | Array<string>;
 }
 
 /** Dropped item stack handle. */
@@ -237,36 +777,60 @@ interface ItemEntity extends Entity {
 interface LivingEntity extends Entity {
     /** The absorption hearts from golden apples and effects. @since 0.2.0 @mc * */
     readonly absorption: number;
-    /** The remaining air ticks; 300 max in vanilla water. @since 0.2.0 @mc * */
-    readonly air: number;
+    /** The armor-toughness attribute value; undefined once the entity is gone or carries no such attribute. @since 0.5.0 @mc * */
+    readonly armorToughness: number;
     /** The armor points from worn gear (0-20 scale). @since 0.2.0 @mc * */
     readonly armorValue: number;
+    /** Whether the entity is a baby; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly baby: boolean;
+    /** The bow draw power of the held item (0 to 1), or 0 when the main hand holds no bow; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly bowPull: number;
+    /** Whether the entity can breathe underwater by its own behaviour (breathing equipment does not count); undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly breathesUnderwater: boolean;
+    /** The stack in the chest armor slot; undefined for an empty slot or a gone entity. @since 0.5.0 @mc * */
+    readonly chestArmor: ItemStack;
+    /** The base (unmodified) maximum health of the entity; undefined once the entity is gone or carries no such attribute. @since 0.5.0 @mc * */
+    readonly defaultMaxHealth: number;
     /** The active status effects as {id, duration, amplifier, infinite} entries; empty once the entity is gone. @since 0.2.0 @mc * */
     readonly effects: Array<StatusEffectData>;
-    /** Whether the entity is currently glowing (outline). @since 0.2.0 @mc * */
-    readonly glowing: boolean;
+    /** The stack in the boots slot; undefined for an empty slot or a gone entity. @since 0.5.0 @mc * */
+    readonly footArmor: ItemStack;
+    /** The stack in the head armor slot; undefined for an empty slot or a gone entity. @since 0.5.0 @mc * */
+    readonly headArmor: ItemStack;
     /** The health value; undefined once the entity is gone. @since 0.1.0 @mc * */
     readonly health: number;
     /** The item in the main hand; undefined for an empty hand or a gone entity. @since 0.2.0 @mc * */
     readonly heldItem: ItemStack;
     /** Whether the entity is hostile (implements the Enemy marker). @since 0.2.0 @mc * */
     readonly hostile: boolean;
-    /** The maximum air ticks (300 in vanilla). @since 0.2.0 @mc * */
-    readonly maxAir: number;
+    /** The stack in the leggings slot; undefined for an empty slot or a gone entity. @since 0.5.0 @mc * */
+    readonly legArmor: ItemStack;
     /** The maximum health value; undefined once the entity is gone. @since 0.2.0 @mc * */
     readonly maxHealth: number;
+    /** Whether the entity discards friction (its "no drag" flag), not whether it is currently sliding; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly noDrag: boolean;
     /** Whether gravity is disabled for the entity. @since 0.2.0 @mc * */
     readonly noGravity: boolean;
     /** The item in the off hand; undefined for an empty hand or a gone entity. @since 0.2.0 @mc * */
     readonly offhandItem: ItemStack;
+    /** Whether the entity counts as part of the game: alive and not a spectator; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly partOfGame: boolean;
     /** Whether the entity is sleeping in a bed. @since 0.2.0 @mc * */
     sleeping: boolean;
     /** The command tags attached to the entity. @since 0.2.0 @mc * */
     readonly tags: Array<string>;
+    /** Whether the entity type belongs to the undead tag; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly undead: boolean;
     /** The remaining use ticks while eating, drinking, or blocking. @since 0.2.0 @mc * */
     readonly useItemRemainingTicks: number;
+    /** Whether the game permits this entity to attack the target; an eligibility check, not a statement of intent. False when either handle is gone or the target is not living. @since 0.5.0 @mc * */
+    canAttack(target: Entity): boolean;
+    /** Whether Minecraft considers the entity eligible for the status effect with the id; this does not check whether the effect is active. Unknown ids answer false. @since 0.5.0 @mc * */
+    canBeAffected(effectId: string): boolean;
     /** Whether a status effect with the given id is active. @since 0.2.0 @mc * */
     hasEffect(id: string): boolean;
+    /** Whether nothing blocks the view from this entity to the target. The simple cast tests three points only; passing false additionally samples four pillars around the target. False when either handle is gone. @since 0.5.0 @mc * */
+    hasLineOfSight(target: Entity, simpleCast?: boolean): boolean;
     /** Whether either hand holds an item of the given id (namespace optional). @since 0.2.0 @mc * */
     isHolding(itemId: string): boolean;
 }
@@ -318,6 +882,9 @@ interface EntitySnapshot {
 interface C2SEventMap {
     'chat:send': ChatSendEvent;
     'input:keyPress': InputKeyPressEvent;
+    'inventory:click': InventoryClickEvent;
+    'inventory:dropSlot': InventoryDropSlotEvent;
+    'packet:send': PacketSendEvent;
     'player:attackBlock': PlayerAttackBlockEvent;
     'player:attackEntity': PlayerAttackEntityEvent;
     'player:interactBlock': PlayerInteractBlockEvent;
@@ -328,24 +895,28 @@ interface S2CEventMap {
     'chat:actionbar': ChatActionbarEvent;
     'chat:receive': ChatReceiveEvent;
     'chat:title': ChatTitleEvent;
+    'packet:receive': PacketReceiveEvent;
     'screen:signEdit': ScreenSignEditEvent;
 }
 /** Client-derived local state; observation only, never cancellable. */
 interface LocalEventMap {
     'dialog:close': DialogCloseEvent;
     'dialog:open': DialogOpenEvent;
+    'entity:customName': EntityCustomNameEvent;
     'entity:damage': EntityDamageEvent;
     'entity:heal': EntityHealEvent;
     'entity:load': EntityLoadEvent;
     'entity:spawn': EntitySpawnEvent;
     'entity:unload': EntityUnloadEvent;
     'game:quit': GameQuitEvent;
+    'game:resourcePack': GameResourcePackEvent;
     'game:start': GameStartEvent;
     'input:wheel': InputWheelEvent;
-    'inventory:click': InventoryClickEvent;
     'inventory:close': InventoryCloseEvent;
     'inventory:open': InventoryOpenEvent;
     'inventory:update': InventoryUpdateEvent;
+    'item:damage': ItemDamageEvent;
+    'item:pickup': ItemPickupEvent;
     'player:air': PlayerAirEvent;
     'player:armor': PlayerArmorEvent;
     'player:damage': PlayerDamageEvent;
@@ -390,6 +961,10 @@ interface CancellableEventMap {
     'chat:send': MutableChatSendEvent;
     'chat:title': MutableChatTitleEvent;
     'input:keyPress': MutableInputKeyPressEvent;
+    'inventory:click': MutableInventoryClickEvent;
+    'inventory:dropSlot': MutableInventoryDropSlotEvent;
+    'inventory:open': MutableInventoryOpenEvent;
+    'packet:send': MutablePacketSendEvent;
     'player:attackBlock': MutablePlayerAttackBlockEvent;
     'player:attackEntity': MutablePlayerAttackEntityEvent;
     'player:interactBlock': MutablePlayerInteractBlockEvent;
@@ -495,14 +1070,22 @@ interface FileStat {
     readonly size: number;
 }
 
-/** The neo.hud module: HUD overlay text rendered on top of the vanilla HUD. Text entries persist across frames until removed or the module unloads. */
+/** The neo.hud module: persistent overlay layers on top of the vanilla HUD. hands out id-keyed handles whose elements are retained in core and re-projected every frame by the engine. Layers are namespaced per module owner (<module>:<id>); unloading a module disposes every layer it created, so overlays disappear with the script that made them. / are the frozen 0.1.0 compatibility face: they upsert/remove text elements on the implicit $legacy layer of the calling module, preserving the original Promise semantics the compat bridge chains on. is the minimal texture registry (G-001 拍板⑥): idempotent owner-namespaced handles whose GPU slots are released on dispose() or module unload. Named canvases self-register into the same registry, so lists both kinds. */
 interface HudApi {
-    /** Adds a persistent text entry on the HUD overlay. @since 0.1.0 @mc * */
+    /** Every live layer of the calling module, ordered by z ascending then id; implicit $legacy sugar layers are excluded. Empty when the caller owns no layers. @since 0.5.0 @mc * */
+    layers: Array<HudLayer>;
+    /** Every live texture of the calling module, in registration order; entries adopted from named canvases included. Empty when the caller owns no textures. @since 0.5.0 @mc * */
+    textures: Array<Texture>;
+    /** Adds a persistent text entry on the HUD overlay (frozen 0.1.0 compatibility face): upserts a text element on the calling module's implicit $legacy layer. @since 0.1.0 @mc * */
     addText(id: string, text: string, x: number, y: number, color: number): Promise<void>;
-    /** Removes a previously added text entry. @since 0.1.0 @mc * */
+    /** Returns the layer under id for the calling module, creating and registering it on first use. Idempotent: repeated calls with the same owner and id hand back the same live handle. Layer ids are namespaced per module, so two scripts may both use "coords" without touching each other; unloading the module disposes its layers. @since 0.5.0 @mc * */
+    layer(id: string, opts?: { z?: number }): HudLayer;
+    /** Removes the calling module's layer under id and disposes every element handle it holds. Unknown ids are ignored. @since 0.5.0 @mc * */
+    removeLayer(id: string): void;
+    /** Removes a previously added text entry (frozen 0.1.0 compatibility face). Unknown ids resolve without effect. @since 0.1.0 @mc * */
     removeText(id: string): Promise<void>;
-    /** Lists all registered text entry identifiers. @since 0.1.0 @mc * */
-    textIds(): Array<string>;
+    /** Returns the calling module's texture under name, creating and registering it on first use (G-001 拍板⑥). Idempotent: repeated calls with the same owner and name hand back the same live handle, so a name is registered exactly once. A named canvas of the same name adopts into this entry (its dimensions win); an entry created here starts as a blank placeholder of the given size, uploaded best-effort — is the awaited upload contract. Unloading the module disposes its textures and releases their GPU slots. @since 0.5.0 @mc * */
+    texture(name: string, spec?: { width?: number, height?: number }): Texture;
 }
 
 /** The neo.input module: keybind registration (surfaced in the vanilla controls menu), raw key press listening, mouse wheel events, and key injection (press/release/hold/set). */
@@ -659,6 +1242,14 @@ interface PerformanceEntry {
     startTime: number;
 }
 
+/** The neo.permission module: the script-facing permission meta API. checkPermission reports whether the trust gate currently allows a capability (or, for a list, every one of them); requestPermission asks the player to grant declared capabilities at runtime, resolving true when granted (the grant persists trust for the whole script and applies to the running script immediately) and false when denied or dismissed. Requesting a capability the manifest does not declare rejects the promise — the declaration is the ceiling, never bypassed. */
+interface PermissionApi {
+    /** Returns whether the trust gate currently allows the capability — or, when a list is given, every one of them. Unknown capability names return false. A script that declares nothing runs under an all-allowing view, so every known capability reports true. @since 0.6.0 @mc * */
+    checkPermission(capability: string | string[]): boolean;
+    /** Asks the player to grant declared capabilities at runtime — one name or a list of them (the prompt then covers the whole list). Already granted capabilities resolve immediately without a prompt. An ungranted request surfaces a confirmation dialog (a clickable chat line on older versions); allowing it persists trust for the whole script (exactly the trust command's decision) and applies to the running script without a reload. Resolves true when granted, false when denied, ignored, or the script unloaded while pending. Rejects with a permission error when the manifest does not declare one of the capabilities or a name is unknown. @since 0.6.0 @mc * */
+    requestPermission(capability: string | string[]): Promise<boolean>;
+}
+
 /** The neo.player module: the local player, the open container (inventory), the open screen (screen), and the open dialog (dialog). self is a live handle reading current state through the player port; outside a world it reads back as undefined. */
 interface PlayerApi {
     /** The currently open dialog as a DialogHandle, or undefined when no dialog screen is open. @since 0.3.0 @mc >=1.21.6 */
@@ -669,8 +1260,16 @@ interface PlayerApi {
     readonly screen: Screen;
     /** The local player handle, or undefined when not in a world. @since 0.1.0 @mc * */
     readonly self: LocalPlayer;
+    /** Builds and opens a client screen from a declarative spec and returns its BuiltScreen session handle. Spec keys: title, showTitle (default true), pause (default false), closeOnEsc (default true), returnTo ('current' | 'game', default 'current'), the ordered controls array (seven types: button, imageButton, checkbox, slider, editBox, cycleButton, lockButton), and the screen-level callbacks onMouseDown/onMouseDrag/onMouseUp/onKeyPress/ onCharTyped/onRender/onClose. Synchronous by decision (the same exemption as close()); an open failure throws a catchable script error — it never crashes the game. The read-only player.screen face keeps answering the neutral base snapshot (kind='script') for this screen. @since 0.5.0 @mc * */
+    buildScreen(spec: ScreenSpec): BuiltScreen;
     /** Opens a client-side dialog from a plain config map and resolves with the chosen action id once player.dialog.clickAction runs; Esc or a manual button click resolves with null when the dialog closes. Config keys: type (notice, confirmation, multi_action), title, body (string or string array), canCloseWithEscape, actions (array of {label}). @since 0.3.0 @mc >=1.21.6 */
     showDialog(config: DialogConfig): Promise<string>;
+    /** Captures a panorama of the current world as six PNGs (panorama_0.png .. panorama_5.png) below <macro root>/<folder>/screenshots/, which is created on demand. The capture routine renders the six directions on the game main thread at its fixed 4096x4096 size, and the promise resolves with the routine's message once the six grabs are queued, so it does not guarantee that the files exist yet (they are written asynchronously). @since 0.5.0 @mc * */
+    takePanorama(folder: string): Promise<string>;
+    /** Writes up to four lines, top to bottom, into the open sign editor; a null line is left unchanged. Synchronous by decision (the same exemption as close()): the write only fills the editor's line buffer, which the vanilla editor shows at once and submits to the server when it closes — no packet is sent while the editor stays open, and the new text reads back through player.screen.getText(). @since 0.5.0 @mc * */
+    writeSign(l1: string, l2: string, l3: string, l4: string): boolean;
+    /** Writes one line into the open sign editor (named separately because the module binding exposes one function per name, so the two shapes cannot share it). The index is zero-based from the top and must be 0 through 3; it is checked even when no sign editor is open. Unlike , this method does not accept null to leave a line unchanged. @since 0.5.0 @mc * */
+    writeSignLine(index: number, message: string): boolean;
 }
 
 /** The local player abilities handle: the creative-mode flags and speed multipliers, readable live and writable client-side. Multiplayer servers keep authority over flying, so writes may be corrected. */
@@ -699,20 +1298,44 @@ interface Abilities {
 
 /** Live advancement handle: the display data and progress of one advancement, re-read on every access. */
 interface Advancement {
+    /** Every obtained criterion with its completion time in milliseconds since the epoch; unobtained criteria are omitted. undefined without a progress entry. @since 0.5.0 @mc * */
+    readonly criterionDates: Record<string, number>;
     /** The display description plain text. @since 0.3.0 @mc * */
     readonly description: string;
+    /** The earliest completion time among this advancement's criteria, in milliseconds since the epoch; undefined without a progress entry or with no criterion obtained. @since 0.5.0 @mc * */
+    readonly earliestProgressObtainDate: number;
+    /** The experience points awarded when this advancement is earned; undefined when the id is no longer known. @since 0.5.0 @mc * */
+    readonly experience: number;
+    /** The localized n/m progress text for the requirement groups (the tab-list fraction), or undefined when there are no criteria, at most one requirement group, or no progress entry. @since 0.5.0 @mc * */
+    readonly fraction: TextComponent;
     /** The display frame (task, goal, challenge). @since 0.3.0 @mc * */
     readonly frame: string;
     /** Whether the advancement is hidden until completed. @since 0.3.0 @mc * */
     readonly hidden: boolean;
     /** The namespaced advancement id. @since 0.3.0 @mc * */
     readonly id: string;
+    /** The loot table identifiers granted as rewards; undefined when the id is no longer known. Inline loot tables (Minecraft 26.3+) carry no registry identifier and are omitted. @since 0.5.0 @mc * */
+    readonly loot: Array<string>;
+    /** The number of requirement groups with at least one obtained criterion; undefined without a progress entry. @since 0.5.0 @mc * */
+    readonly obtainedRequirementCount: number;
     /** The parent advancement id, or undefined on roots. @since 0.3.0 @mc * */
     readonly parentId: string;
+    /** The fraction of requirement groups satisfied (0 to 1; an empty requirement set yields 0); undefined without a progress entry. @since 0.5.0 @mc * */
+    readonly percentage: number;
     /** The live progress, or undefined without server progress data. @since 0.3.0 @mc * */
     readonly progress: AdvancementProgress;
+    /** The recipe identifiers unlocked as rewards; undefined when the id is no longer known. @since 0.5.0 @mc * */
+    readonly recipes: Array<string>;
+    /** The criterion requirement groups: every group must be satisfied, and any one criterion of a group satisfies that group; the number of groups is requirements.length. undefined when the id is no longer known. @since 0.5.0 @mc * */
+    readonly requirements: Array<Array<string>>;
     /** The display title plain text. @since 0.3.0 @mc * */
     readonly title: string;
+    /** The completion time of one criterion in milliseconds since the epoch; -1 when the criterion is unknown or not yet obtained, undefined without a progress entry. @since 0.5.0 @mc * */
+    getCriterionProgress(criteria: string): number;
+    /** Whether a named criterion is completed; unknown names read as false (no exception), without a progress entry as false. @since 0.5.0 @mc * */
+    isCriteriaObtained(criteria: string): boolean;
+    /** This advancement's full definition encoded as a JSON string (the datapack shape: parent, display, criteria, requirements, rewards); undefined when the id is no longer known or the definition does not encode. @since 0.5.0 @mc * */
+    toJson(): string;
 }
 
 /** The client-known progress of one advancement: whether it is done, which criteria are obtained, and which are still open. */
@@ -731,6 +1354,8 @@ interface Advancements {
     readonly completed: Array<string>;
     /** The ids of every client-known advancement, in registry order. @since 0.3.0 @mc * */
     readonly ids: Array<string>;
+    /** The ids of advancements that have a progress entry but are not complete, including entries with no criterion obtained (the complement of among progress entries). @since 0.5.0 @mc * */
+    readonly missing: Array<string>;
     /** The ids of root advancements (those without a parent). @since 0.3.0 @mc * */
     readonly roots: Array<string>;
     /** The ids of started but incomplete advancements. @since 0.3.0 @mc * */
@@ -745,12 +1370,18 @@ interface Advancements {
 interface AnvilInventory extends Inventory {
     /** The repair/enchant level cost charged by the open anvil. @since 0.2.0 @mc * */
     readonly cost: number;
+    /** The fixed anvil cost threshold of 40 levels. @since 0.5.0 @mc * */
+    readonly costLimit: number;
     /** The left (first) input stack, or undefined. @since 0.2.0 @mc * */
     readonly firstInput: ItemStack;
+    /** The text currently in the anvil rename box, or undefined without an anvil screen. This is box text, not a guarantee that the anvil produces a result. @since 0.5.0 @mc * */
+    readonly itemName: string;
     /** The combined result stack, or undefined. @since 0.2.0 @mc * */
     readonly result: ItemStack;
     /** The right (second) input stack, or undefined. @since 0.2.0 @mc * */
     readonly secondInput: ItemStack;
+    /** Writes the anvil rename box, re-running the menu's result and cost computation; a no-op without an anvil screen. The rename is applied by taking the result. @since 0.5.0 @mc * */
+    setItemName(name: string): Promise<void>;
 }
 
 /** A beacon screen: the payment slot, effect selection, and power level. */
@@ -763,6 +1394,12 @@ interface BeaconInventory extends Inventory {
     readonly primaryEffect: string;
     /** The secondary effect id, or undefined. @since 0.2.0 @mc * */
     readonly secondaryEffect: string;
+    /** Sends the selected effects to the server and closes the screen; resolves false when the payment slot is empty or no beacon screen is open. @since 0.5.0 @mc * */
+    applyEffects(): Promise<boolean>;
+    /** Highlights a primary effect reachable at the current beacon level; the selection stays on the screen until sends it. Resolves false when the id matches nothing. @since 0.5.0 @mc * */
+    selectPrimary(id: string): Promise<boolean>;
+    /** Highlights a secondary effect reachable at the current beacon level (level 3 or above); the selection stays on the screen until sends it. Resolves false when the id matches nothing. @since 0.5.0 @mc * */
+    selectSecondary(id: string): Promise<boolean>;
 }
 
 /** The book editor with the page text under edit. */
@@ -773,6 +1410,14 @@ interface BookEditScreen extends Screen {
 
 /** The book view screen. */
 interface BookViewScreen extends Screen {
+}
+
+/** Outcome of a client-side block-break attempt: a diagnostic reason code and the position it applies to (null unless the reason is SUCCESS). */
+interface BreakBlockResult {
+    /** pos @since 0.5.0 @mc * */
+    readonly pos: BlockPos;
+    /** reason @since 0.5.0 @mc * */
+    readonly reason: string;
 }
 
 /** A brewing stand screen: the three bottles, ingredient, fuel, and the live brew progress. */
@@ -791,6 +1436,18 @@ interface BrewingStandInventory extends Inventory {
     readonly totalBrewingTicks: number;
     /** The total fuel uses a full blaze rod charges. @since 0.2.0 @mc * */
     readonly totalFuelUses: number;
+    /** Whether the stand could brew right now: a valid ingredient with at least one potion slot that matches it. Fuel and brew progress are not considered. undefined without an open brewing stand or when brewing recipes are unavailable. @since 0.5.0 @mc * */
+    canBrewCurrentInput(): boolean;
+    /** Whether the stack holds a potion type used as the result of a brewing recipe, or undefined when brewing recipes are unavailable. @since 0.5.0 @mc * */
+    isBrewablePotion(potion: ItemStack): boolean;
+    /** Whether the stack is a valid brewing ingredient, or undefined when brewing recipes are unavailable. @since 0.5.0 @mc * */
+    isValidIngredient(ingredient: ItemStack): boolean;
+    /** Whether the potion and the ingredient can be brewed together, or undefined when brewing recipes are unavailable. @since 0.5.0 @mc * */
+    isValidRecipe(potion: ItemStack, ingredient: ItemStack): boolean;
+    /** The stack the potion becomes when the ingredient is brewed into it; a potion with no matching mix reads back unchanged, and undefined when brewing recipes are unavailable. @since 0.5.0 @mc * */
+    previewPotion(potion: ItemStack, ingredient: ItemStack): ItemStack;
+    /** The three potion slots after brewing with the current ingredient, in slot order; empty without an open brewing stand. Slots that cannot change (empty, or no ingredient loaded) read back as they are. @since 0.5.0 @mc * */
+    previewPotions(): Array<ItemStack>;
 }
 
 /** A cartography table screen: the map, the material, and the result. */
@@ -830,11 +1487,59 @@ interface ContainerScreen extends Screen {
 }
 
 /** A crafting table screen: the 3x3 grid and the result slot. */
-interface CraftingInventory extends Inventory {
+interface CraftingInventory extends RecipeInventory {
     /** The 3x3 crafting grid (menu slots 1-9). @since 0.2.0 @mc * */
     grid: Array<ItemStack>;
     /** The crafting result stack, or undefined. @since 0.2.0 @mc * */
     readonly result: ItemStack;
+}
+
+/** The creative inventory screen: the item-list tabs, search, scrolling, saved hotbars, and the cursor stack over the player inventory face. Equipment and hotbar reads answer from the player's own inventory, the same slots exposes. */
+interface CreativeInventory extends Inventory {
+    /** The boots stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly boots: ItemStack;
+    /** The chestplate stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly chestplate: ItemStack;
+    /** The helmet stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly helmet: ItemStack;
+    /** The leggings stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly leggings: ItemStack;
+    /** The offhand stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly offhand: ItemStack;
+    /** The item stacks the creative list currently holds, in display order (empty slots skipped); empty without an open creative screen. @since 0.5.0 @mc * */
+    readonly shownItems: Array<ItemStack>;
+    /** The localized display name of every creative tab, in display order; empty without an open creative screen. These names are not tab ids and are the values matched by . @since 0.5.0 @mc * */
+    readonly tabNames: Array<string>;
+    /** Every creative tab's display name as a text object, in the same order as ; empty without an open creative screen. @since 0.5.0 @mc * */
+    readonly tabTexts: Array<TextComponent>;
+    /** Clears every player inventory slot by sending an empty stack for each slot through the creative item-add operation. Risk: the requests are only accepted while the server allows creative-mode slot edits; on a survival server they are rejected and the inventory stays unchanged. @since 0.5.0 @mc * */
+    destroyAllItems(): Promise<void>;
+    /** Clears the stack carried on the cursor. Client-side only until the cursor is used; a no-op without an open creative screen. @since 0.5.0 @mc * */
+    destroyHeldItem(): Promise<void>;
+    /** The item stacks stored in a saved-hotbar slot, in hotbar order; an empty list for an out-of-range index or an unset slot. @since 0.5.0 @mc * */
+    getSavedHotbar(index: number): Array<ItemStack>;
+    /** Whether a player inventory slot is the hotbar or the offhand (player inventory order: 0-8 hotbar, 40 offhand). @since 0.5.0 @mc * */
+    isInHotbar(slot: number): boolean;
+    /** Restores a saved-hotbar slot onto the current hotbar; a no-op for an out-of-range index or without an open creative screen. @since 0.5.0 @mc * */
+    restoreHotbar(index: number): Promise<void>;
+    /** Saves the current hotbar into a saved-hotbar slot; a no-op for an out-of-range index or without an open creative screen. @since 0.5.0 @mc * */
+    saveHotbar(index: number): Promise<void>;
+    /** Scrolls the creative item list by a relative amount; the resulting position is clamped to 0..1. A no-op on a screen without a scrollbar. @since 0.5.0 @mc * */
+    scroll(amount: number): Promise<void>;
+    /** Sets the creative item list's scroll position (clamped to 0..1); a no-op on a screen without a scrollbar. @since 0.5.0 @mc * */
+    scrollTo(position: number): Promise<void>;
+    /** Replaces the search box text and refreshes the results; does nothing unless the search tab is selected. @since 0.5.0 @mc * */
+    search(text: string): Promise<void>;
+    /** Selects the hotbar tab; a no-op when no creative screen is open. @since 0.5.0 @mc * */
+    selectHotbar(): Promise<void>;
+    /** Selects the inventory tab; a no-op when no creative screen is open. @since 0.5.0 @mc * */
+    selectInventory(): Promise<void>;
+    /** Selects the search tab; a no-op when no creative screen is open. @since 0.5.0 @mc * */
+    selectSearch(): Promise<void>;
+    /** Selects the tab whose display name exactly matches the argument; resolves false when no tab has that name. @since 0.5.0 @mc * */
+    selectTab(tabName: string): Promise<boolean>;
+    /** Sets the stack carried on the cursor; a null stack clears it. @since 0.5.0 @mc * */
+    setCursorStack(stack: ItemStack): Promise<void>;
 }
 
 /** The creative inventory screen. */
@@ -923,28 +1628,56 @@ interface DisconnectedScreen extends Screen {
 interface EnchantInventory extends Inventory {
     /** The three enchantment level costs shown on the table. @since 0.2.0 @mc * */
     readonly costs: Array<number>;
+    /** The registry id of each offered enchantment, in option order; an option the table does not offer reads as undefined. @since 0.5.0 @mc * */
+    readonly enchantmentIds: Array<string>;
+    /** The three offered enchantments as {id, level} entries in option order; an option the table does not offer reads as undefined. @since 0.5.0 @mc * */
+    readonly enchantments: Array<EnchantmentData>;
     /** The lapis count the table reports. @since 0.2.0 @mc * */
     readonly goldCount: number;
     /** The item being enchanted, or undefined. @since 0.2.0 @mc * */
     readonly item: ItemStack;
     /** The lapis stack, or undefined. @since 0.2.0 @mc * */
     readonly lapis: ItemStack;
+    /** Asks the table to buy one of its three options (0-2); resolves false when the local menu check refuses the index, and false without an open enchanting table. @since 0.5.0 @mc * */
+    doEnchant(index: number): Promise<boolean>;
 }
 
-/** A furnace-family container screen: input/fuel/output slots plus the live burn state read from the open menu. */
-interface FurnaceInventory extends Inventory {
+/** A furnace-family container screen: input/fuel/output slots, the live burn and cook state read from the open menu, and the recipe-book face inherited from . The furnace input grid is the single smelting slot, so input(x, z) reads it regardless of the coordinates. */
+interface FurnaceInventory extends RecipeInventory {
     /** The fuel burn progress (0-1), or undefined. @since 0.2.0 @mc * */
     readonly burnProgress: number;
+    /** The furnace input grid is one slot tall. @since 0.5.0 @mc * */
+    readonly craftingHeight: number;
+    /** The furnace input slot count, excluding fuel and result. @since 0.5.0 @mc * */
+    readonly craftingSlotCount: number;
+    /** The furnace input grid is the single smelting slot. @since 0.5.0 @mc * */
+    readonly craftingWidth: number;
     /** The fuel stack, or undefined. @since 0.2.0 @mc * */
     readonly fuel: ItemStack;
-    /** The smelting input stack, or undefined. @since 0.2.0 @mc * */
-    readonly input: ItemStack;
+    /** The remaining fuel burn time in ticks, or undefined. @since 0.5.0 @mc * */
+    readonly fuelTime: number;
+    /** The total fuel burn time in ticks, or undefined. @since 0.5.0 @mc * */
+    readonly fuelTimeTotal: number;
+    /** The level's fuel values as item id to burn ticks; an empty map when the level does not expose them. @since 0.5.0 @mc * */
+    readonly fuelValues: Record<string, number>;
     /** Whether the furnace is currently burning. @since 0.2.0 @mc * */
     readonly lit: boolean;
     /** The smelting arrow progress (0-1), or undefined. @since 0.2.0 @mc * */
     readonly litProgress: number;
     /** The smelted output stack, or undefined. @since 0.2.0 @mc * */
     readonly output: ItemStack;
+    /** The smelting input stack, or undefined. @since 0.2.0 @mc * */
+    readonly smeltedItem: ItemStack;
+    /** The smelting progress in ticks, or undefined. @since 0.5.0 @mc * */
+    readonly smeltingTime: number;
+    /** The total smelting time in ticks, or undefined. @since 0.5.0 @mc * */
+    readonly smeltingTimeTotal: number;
+    /** The smelting input, ignoring the coordinates; the furnace has one input slot. @since 0.5.0 @mc * */
+    getInput(x: number, z: number): ItemStack;
+    /** Whether the stack burns as furnace fuel, or undefined without an open furnace-family menu. @since 0.5.0 @mc * */
+    isFuel(stack: ItemStack): boolean;
+    /** Whether the open furnace menu accepts the stack as a smelting input, or undefined without one. @since 0.5.0 @mc * */
+    isSmeltable(stack: ItemStack): boolean;
 }
 
 /** A grindstone screen: the two input slots and the disenchanted result. */
@@ -955,30 +1688,98 @@ interface GrindstoneInventory extends Inventory {
     readonly result: ItemStack;
     /** The top input stack, or undefined. @since 0.2.0 @mc * */
     readonly topInput: ItemStack;
+    /** The lower bound of the experience a grindstone run would award for the two inputs; the real award is random between this value and twice it minus one. Reads as undefined without an open grindstone. @since 0.5.0 @mc * */
+    xpEstimate(): number;
 }
 
 /** A mount inventory screen: the saddle and body armor slots over the ordinary slot face. */
 interface HorseInventory extends Inventory {
     /** The stack in the body armor slot. @since 0.2.0 @mc * */
     readonly armor: ItemStack;
+    /** The mount this screen belongs to, as a species-specific entity handle; undefined without an open mount screen. @since 0.5.0 @mc * */
+    horse: Entity;
+    /** The carried slots in menu order, including empty slots as null entries; an empty list when the mount has no chest. @since 0.5.0 @mc * */
+    horseInventory: Array<ItemStack>;
+    /** The number of carried slots (15 for a chested mount, otherwise 0); undefined without an open mount screen. @since 0.5.0 @mc * */
+    readonly inventorySize: number;
     /** The stack in the saddle slot. @since 0.2.0 @mc * */
     readonly saddle: ItemStack;
+    /** Whether a saddle is currently equipped; undefined without an open mount screen. @since 0.5.0 @mc * */
+    readonly saddled: boolean;
+    /** Whether the mount can use its saddle slot (false for untamed, baby, or dead mounts); it does not report whether a saddle is equipped. undefined without an open mount screen. @since 0.5.0 @mc * */
+    canBeSaddled(): boolean;
+    /** Whether the mount can use the body-armor slot; it does not report whether armor is equipped. undefined without an open mount screen. @since 0.5.0 @mc * */
+    hasArmorSlot(): boolean;
+    /** Whether the mount carries a chest; undefined without an open mount screen. @since 0.5.0 @mc * */
+    hasChest(): boolean;
 }
 
-/** Live inventory handle: slot reads re-query the inventory port on every access; actions dispatch on the main thread and resolve once processed. */
+/** Interaction override handle: the client-side crosshair-target override, the block-break outcome override and the held-use override. Override semantics. These three overrides are shared client-side state for the whole game, not per-player state, and they never grant server reach: Target — once stored, player.target (and every crosshair-driven action on this handle, interact() and breakBlock()) reads the override instead of the real pick until or a failing check removes it. The vanilla crosshair itself is left alone, so vanilla code keeps acting on what the player actually aims at. Break — arming tracks one block position and settles the pending promise with a ; a reason code reports why it ended. Client-side outcomes only, never server confirmation. Interact — while held, the client re-issues the use action every few ticks until stopped, the use key is pressed or the world unloads. restores all three to their defaults, which is what the game itself does on world join and disconnect. */
+interface Interactions {
+    /** Whether the break override is armed and still valid. The client validates it every tick, so reading never has to end it. @since 0.5.0 @mc * */
+    readonly breakOverride: boolean;
+    /** Whether the held-use override is currently active (the flag only; it does not query the physical use key or the item being used). @since 0.5.0 @mc * */
+    readonly interactOverride: boolean;
+    /** Whether a target override is stored, including a stored miss. Reading does not revalidate it. @since 0.5.0 @mc * */
+    readonly targetOverride: boolean;
+    /** Queues a one-shot outcome callback for the next break-override settlement and optionally arms the break override: breaking true resets the tracked position and starts no break action, false leaves the override unchanged. The callback receives the outcome as a scalar tuple (reason, x, y, z) — the position coordinates are null unless the reason is SUCCESS (the handle-path guest-function contract passes neutral scalars; use promises for the typed result record). Callbacks run once on the game main thread when an outcome settles, then the queue clears; an exception in one callback does not stop the others. @since 0.5.0 @mc * */
+    addBreakCallback(callback: (reason: string, x: number | null, y: number | null, z: number | null) => void, breaking: boolean): void;
+    /** Breaks the block at the position, or the block the pick currently reports when the position is omitted, and resolves with the outcome: SUCCESS carries the broken position, every other reason (CANCELLED RESET NO_TARGET TARGET_LOST TARGET_CHANGE IS_AIR NOT_BREAKING) reports why it ended and carries no position. Instant-break blocks resolve at once; harder blocks advance through the game's own destroy path while this call holds the break override. The outcome is client-side only. @since 0.5.0 @mc * */
+    breakBlock(pos?: BlockPos): Promise<BreakBlockResult>;
+    /** Cancels the active break override, settling a pending break with CANCELLED. @since 0.5.0 @mc * */
+    cancelBreak(): Promise<void>;
+    /** Clears the target override so player.target reads the real crosshair pick again. Clearing can settle a pending break with TARGET_LOST. @since 0.5.0 @mc * */
+    clearTarget(): Promise<void>;
+    /** Starts (holding true) or stops the continuous held-use override: while held the client re-issues the use action every few ticks until stopped, the use key is pressed or the world unloads. awaitFirstClick is accepted for compatibility; this face always settles once the override has been applied, never on a server round trip. @since 0.5.0 @mc * */
+    holdInteract(holding: boolean, awaitFirstClick?: boolean): Promise<void>;
+    /** Holds the use override for up to ticks unpaused ticks and then releases it (stopOnPause defaults true: paused ticks do not count, the hold stops as soon as the game pauses). Resolves with the ticks that did not elapse — 0 for a full run, nonzero when the hold stopped early. @since 0.5.0 @mc * */
+    holdInteractFor(ticks: number, stopOnPause?: boolean): Promise<number>;
+    /** Uses (right-clicks) whatever the pick currently reports — the target override when one is set, otherwise the real crosshair: a block face, an entity, or the held item in the air. The named hand defaults to main. @since 0.5.0 @mc * */
+    interact(hand?: string): Promise<void>;
+    /** Whether the stored target override passes the client interaction reach at the interpolation fraction (0 when omitted). False with no override; a stored miss always passes. This is a query: it never clears the override. @since 0.5.0 @mc * */
+    isTargetInRange(tickDelta?: number): boolean;
+    /** Reports a client-side destruction call result to the active break override: broken true ends it and settles a pending break with SUCCESS at the position; false leaves it unchanged. The game's own break path already feeds this, so scripts normally never call it. @since 0.5.0 @mc * */
+    onBreakBlock(pos: BlockPos, broken: boolean): Promise<void>;
+    /** Restores every override to its default: the three target checks, the target override, the break override (a pending break settles with RESET) and the held-use override. The game runs the same reset on world join and disconnect. @since 0.5.0 @mc * */
+    reset(): Promise<void>;
+    /** Restores the three checks to their defaults (range on and clearing, air off and retaining, shape on and rendering a miss). The stored target is neither cleared nor immediately revalidated. @since 0.5.0 @mc * */
+    resetChecks(): Promise<void>;
+    /** Configures the air check: enabled rejects an air block target (defaults false), autoClear drops it instead of rendering it as a miss (defaults false). @since 0.5.0 @mc * */
+    setAirCheck(enabled: boolean, autoClear: boolean): Promise<void>;
+    /** Arms or disarms the break override. Disabling reports reason (a pending break settles with it and no position), stops client-side breaking while the attack key is up, and resets the tracked position; enabling only arms it and starts no break action. @since 0.5.0 @mc * */
+    setBreakOverride(value: boolean, reason?: string): Promise<void>;
+    /** Configures the reach check: enabled runs it while the override is read (defaults true), autoClear drops an out-of-range override instead of rendering it as a miss (defaults true). @since 0.5.0 @mc * */
+    setRangeCheck(enabled: boolean, autoClear: boolean): Promise<void>;
+    /** Configures the empty-shape check: enabled rejects a block whose collision shape is empty (defaults true, air excluded), autoClear drops it instead of rendering it as a miss (defaults false). @since 0.5.0 @mc * */
+    setShapeCheck(enabled: boolean, autoClear: boolean): Promise<void>;
+    /** Stores a block target override at the block center on the named face (up/down/north/south/ east/west; defaults to down). Unknown faces throw. @since 0.5.0 @mc * */
+    setTarget(pos: BlockPos, face?: string): Promise<void>;
+    /** Stores an entity target override; the entity handle must be loaded (the same contract as ). @since 0.5.0 @mc * */
+    setTargetEntity(entity: Entity): Promise<void>;
+    /** Stores a fixed miss override: the pick reports nothing at all until the override is cleared. A stored miss passes the range check. @since 0.5.0 @mc * */
+    setTargetMissed(): Promise<void>;
+}
+
+/** Live inventory handle: slot reads re-query the inventory port on every access; actions dispatch on the main thread and resolve once processed. Two slot index spaces stay distinct: , and the equipment getters take the player inventory order (0-8 hotbar, 9-35 main, 36-39 armor, 40 offhand), while , and take whole-screen menu indices (container rows first, player rows last). */
 interface Inventory {
     /** The stack held on the mouse cursor over the open menu, or undefined. @since 0.3.0 @mc * */
     readonly carried: ItemStack;
+    /** The network sync id of the open menu (0 for the player's own menu), or undefined outside a world. @since 0.5.0 @mc * */
+    readonly containerId: number;
     /** Total item count per item id across the inventory. @since 0.3.0 @mc * */
     readonly itemCount: Record<string, number>;
     /** All non-empty stacks keyed by their slot index; every value is a full ItemStack handle, the same type slot() returns. @since 0.3.0 @mc * */
     items: Record<number, ItemStack>;
     /** The inventory kind (player, chest, crafting, ...). @since 0.1.0 @mc * */
     readonly kind: string;
+    /** The open container menu as a raw host object behind this handle's wraps target; undefined outside a world. Requires the java permission. @since 0.5.0 @mc * @requires permission 'java' */
+    readonly raw: JavaObject;
     /** The selected hotbar slot (0-8), or undefined. @since 0.3.0 @mc * */
     readonly selectedHotbarSlot: number;
     /** The inventory slot count. @since 0.1.0 @mc * */
     readonly size: number;
+    /** The menu slot index under the mouse, or undefined without a container screen or when the pointer sits over no slot. @since 0.5.0 @mc * */
+    readonly slotUnderMouse: number;
     /** The inventory display title. @since 0.1.0 @mc * */
     readonly title: string;
     /** Clicks a slot (button 0 = left, 1 = right, 2 = middle-click clone in creative; shift = quick move). @since 0.1.0 @mc * */
@@ -1003,12 +1804,18 @@ interface Inventory {
     findFreeInventorySlot(): number;
     /** First slot holding the given item id, or undefined. @since 0.1.0 @mc * */
     findId(itemId: string): number;
+    /** The screen-space top-left corner of one menu slot (whole-screen slot order), or undefined without a container screen or for an out-of-range index. @since 0.5.0 @mc * */
+    getSlotPos(slot: number): Pos2D;
     /** Picks the slot up, then gathers every matching stack onto the cursor (the double-click collect semantics). @since 0.3.0 @mc * */
     grabAll(slot: number): Promise<void>;
+    /** Opens this inventory's screen on the client: the survival inventory for the player handle, while container handles need their own screen to still be open (the server owns container openings). @since 0.5.0 @mc * */
+    open(): Promise<void>;
     /** Quick-moves every slot that can merge with the given slot's stack (same backing container). Returns the moved item count. @since 0.3.0 @mc * */
     quickAll(slot: number, button?: number): Promise<number>;
     /** Quick-moves a slot to the other inventory. @since 0.1.0 @mc * */
     quickMove(slot: number): Promise<void>;
+    /** The named region one menu slot belongs to (whole-screen slot order), or undefined for an index outside the open menu. @since 0.5.0 @mc * */
+    regionOf(slot: number): string;
     /** Selects the active hotbar slot (0-8). @since 0.3.0 @mc * */
     setSelectedHotbarSlot(index: number): Promise<void>;
     /** Reads the stack at a slot, or undefined when out of range or empty. @since 0.1.0 @mc * */
@@ -1041,6 +1848,8 @@ interface LocalPlayer extends Player {
     readonly breakingBlock: boolean;
     /** The entity interaction range in blocks (survival base 3.0; the creative modifier raises it to 3.5; attribute modifiers apply). @since 0.2.0 @mc * */
     readonly entityInteractionRange: number;
+    /** The interaction override handle: the crosshair-target, block-break and held-use overrides plus the crosshair-driven use/break actions that read them; null without a world. @since 0.5.0 @mc * */
+    readonly interactions: Interactions;
     /** The client-side statistics handle: typed per-category queries over the live stat counters. null without a world. @since 0.3.0 @mc * */
     readonly statistics: Statistics;
     /** The crosshair pick: the first block or entity inside the interaction ranges, re-read on every access. null without a world. @since 0.3.0 @mc * */
@@ -1073,6 +1882,16 @@ interface LocalPlayer extends Player {
     teleport(x: number, y: number, z: number): Promise<void>;
 }
 
+/** A loom screen: the banner pattern offer over the ordinary slot face. The offer depends on the pattern slot item; the banner and dye do not change it. */
+interface LoomInventory extends Inventory {
+    /** The banner pattern registry ids the loom offers for the current pattern-slot item, in selection order; empty without an open loom. @since 0.5.0 @mc * */
+    readonly patterns: Array<string>;
+    /** Applies the offered pattern at its zero-based position and asks the server to apply it; resolves false when the index is out of range or the pattern list is not displayed. @since 0.5.0 @mc * */
+    selectPattern(index: number): Promise<boolean>;
+    /** Applies the offered pattern with the given registry id and asks the server to apply it; resolves false when the id is not offered or the pattern list is not displayed. @since 0.5.0 @mc * */
+    selectPatternId(id: string): Promise<boolean>;
+}
+
 /** The pause screen. */
 interface PauseScreen extends Screen {
 }
@@ -1099,12 +1918,72 @@ interface Player extends LivingEntity {
     toJSON(): string;
 }
 
-/** The local player's own inventory: the always-available inventory session (what player.inventory resolves to while the inventory screen is open and when no container screen is open). */
-interface PlayerInventory extends Inventory {
+/** The local player's own inventory: the always-available inventory session (what player.inventory resolves to while the inventory screen is open and when no container screen is open). Equipment and offhand reads use the player inventory order (36 boots ... 39 helmet, 40 offhand); the craft-grid reads address the player menu itself. */
+interface PlayerInventory extends RecipeInventory {
+    /** The boots stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly boots: ItemStack;
+    /** The chestplate stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly chestplate: ItemStack;
+    /** The player menu reports a fixed 2x2 craft grid. @since 0.5.0 @mc * */
+    readonly craftingHeight: number;
+    /** The player menu reports a fixed 2x2 craft grid. @since 0.5.0 @mc * */
+    readonly craftingWidth: number;
+    /** The helmet stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly helmet: ItemStack;
+    /** The leggings stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly leggings: ItemStack;
+    /** The offhand stack, or undefined when empty. @since 0.5.0 @mc * */
+    readonly offhand: ItemStack;
+    /** Whether a player inventory slot is the hotbar or the offhand (player inventory order: 0-8 hotbar, 40 offhand). @since 0.5.0 @mc * */
+    isInHotbar(slot: number): boolean;
 }
 
 /** A loading or progress screen. */
 interface ProgressScreen extends Screen {
+}
+
+/** One recipe-book entry: the output stack, the accepted ingredient alternatives per slot, craftability checks against the player's inventory, and the craft action through its recipe-book screen. Handles are snapshots of one book entry; the craftability checks re-query the live inventory on every call, and acts through whatever recipe-book screen is open when it runs. */
+interface Recipe {
+    /** The namespaced recipe book category id (e.g. minecraft:crafting). @since 0.6.0 @mc * */
+    readonly category: string;
+    /** How many crafts the player's inventory plus the open menu's craft slots allow, or undefined when the entry is unknown. @since 0.6.0 @mc * */
+    readonly craftableAmount: number;
+    /** The ingredient slots with the stacks each slot accepts, as [slot][alternative]; empty cells read as empty lists. @since 0.6.0 @mc * */
+    readonly ingredients: ItemStack[][];
+    /** The output stack of one craft, or undefined when unresolvable. @since 0.6.0 @mc * */
+    readonly output: ItemStack;
+    /** The recipe's book entry key. Unstable across menu switches and sessions. @since 0.6.0 @mc * */
+    readonly recipeKey: string;
+    /** Whether one craft is possible from the player's inventory plus the open menu's craft slots, or with the optional amount, whether at least that many crafts are possible. @since 0.6.0 @mc * */
+    canCraft(amount?: number): boolean;
+    /** Requests one craft through the recipe book of the open screen; craftAll crafts as many times as the ingredients allow. Rejects when no recipe-book screen is open. @since 0.6.0 @mc * */
+    craft(craftAll?: boolean): Promise<void>;
+}
+
+/** The recipe-book family face shared by the crafting-capable screens: grid dimensions, the input grid, and the recipe-book visibility. Grid reads answer for the menu open right now, so a stale handle reports whatever menu is currently open. */
+interface RecipeInventory extends Inventory {
+    /** The recipe book entries currently reported craftable from the player's inventory plus this menu's craft slots, or undefined without an open recipe-book screen. @since 0.6.0 @mc * */
+    craftableRecipes: Recipe[];
+    /** The open recipe menu's grid height, or 0 without one. @since 0.5.0 @mc * */
+    readonly craftingHeight: number;
+    /** The grid cell count (width x height), or 0 without an open recipe menu. @since 0.5.0 @mc * */
+    readonly craftingSlotCount: number;
+    /** The open recipe menu's grid width, or 0 without one. @since 0.5.0 @mc * */
+    readonly craftingWidth: number;
+    /** The whole input grid indexed as [x][z]; empty cells read as undefined. A menu without a grid yields an empty grid. @since 0.5.0 @mc * */
+    readonly input: ItemStack[][];
+    /** The input grid cell count (width x height), or 0. @since 0.5.0 @mc * */
+    readonly inputSize: number;
+    /** Whether the open recipe-book screen shows its recipe book, or undefined without one. @since 0.5.0 @mc * */
+    readonly recipeBookOpened: boolean;
+    /** One input-grid cell by column (x) and row (z), or undefined outside the grid or when empty. @since 0.5.0 @mc * */
+    getInput(x: number, z: number): ItemStack;
+    /** The recipe book entries of the open recipe-book screen's tabs, optionally limited to the entries craftable from the player's inventory plus this menu's craft slots, or undefined without an open recipe-book screen. @since 0.6.0 @mc * */
+    getRecipes(craftable: boolean): Recipe[];
+    /** Shows or hides the recipe book of the open recipe-book screen; a no-op without one or when the state already matches. @since 0.5.0 @mc * */
+    setRecipeBook(open: boolean): Promise<void>;
+    /** Toggles the recipe book of the open recipe-book screen; a no-op without one. @since 0.5.0 @mc * */
+    toggleRecipeBook(): Promise<void>;
 }
 
 /** Base handle for any open screen: the MC class name, the kind label, the title, and Esc-style close. */
@@ -1119,9 +1998,9 @@ interface Screen {
     close(): void;
 }
 
-/** The sign editor with the front-face text. */
+/** The sign editor with the text under edit. */
 interface SignScreen extends Screen {
-    /** The front-face sign text, line-joined. @since 0.3.0 @mc * */
+    /** The sign text under edit, line-joined; reflects writeSign immediately (the editor's live buffer, submitted on close). @since 0.3.0 @mc * */
     readonly text: string;
 }
 
@@ -1141,6 +2020,8 @@ interface SmithingInventory extends Inventory {
 interface Statistics {
     /** Every non-zero stat as a typed entry (category is the stat type id, key the entry id). @since 0.3.0 @mc * */
     readonly entries: Array<StatisticsEntry>;
+    /** Every non-zero stat as a formatted entry, keyed exactly like . @since 0.5.0 @mc * */
+    readonly formattedStatMap: Record<string, string>;
     /** Reads the live non-zero stat map (statTypeId:valueId -> value). @since 0.3.0 @mc * */
     readonly snapshot: Record<string, number>;
     /** How many of the item the player has broken (depleted). @since 0.3.0 @mc * */
@@ -1151,6 +2032,8 @@ interface Statistics {
     custom(statId: string): number;
     /** How many of the item the player has dropped. @since 0.3.0 @mc * */
     dropped(itemId: string): number;
+    /** The formatted counter behind one stat key (the keys of ), rendered by the stat's own formatter (minecraft:custom:minecraft:play_time reads as an elapsed time). Unknown or zero-valued keys read as undefined. @since 0.5.0 @mc * */
+    formattedValue(statKey: string): string;
     /** How many of the entity the player has killed. @since 0.3.0 @mc * */
     killed(entityId: string): number;
     /** How many times the entity kind has killed the player. @since 0.3.0 @mc * */
@@ -1159,6 +2042,8 @@ interface Statistics {
     mined(blockId: string): number;
     /** How many of the item the player has picked up. @since 0.3.0 @mc * */
     pickedUp(itemId: string): number;
+    /** The display name of the stat type behind one stat key (the minecraft:mined part of minecraft:mined:minecraft:stone, rendered in the current language); unknown keys read as undefined. @since 0.5.0 @mc * */
+    statText(statKey: string): TextComponent;
     /** How many times the player has used the item. @since 0.3.0 @mc * */
     used(itemId: string): number;
     /** The value of one stat: category is the stat type id (minecraft:mined, minecraft:custom, ...), key the entry id. Unknown entries read as 0. @since 0.3.0 @mc * */
@@ -1181,8 +2066,14 @@ interface StonecutterInventory extends Inventory {
     readonly input: ItemStack;
     /** How many recipes the visible set offers. @since 0.2.0 @mc * */
     readonly recipeCount: number;
+    /** The displayed result of each currently visible recipe, in selection-index order; empty without an open stonecutter. @since 0.5.0 @mc * */
+    readonly recipes: Array<ItemStack>;
     /** The selected recipe index, or undefined without input. @since 0.2.0 @mc * */
     readonly selectedRecipeIndex: number;
+    /** Whether the menu has an input item, or undefined without an open stonecutter. @since 0.5.0 @mc * */
+    canCraft(): boolean;
+    /** Selects one of the currently visible recipes by its zero-based index; an out-of-range index is a no-op, as is a call without an open stonecutter. @since 0.5.0 @mc * */
+    selectRecipe(idx: number): Promise<void>;
 }
 
 /** The structure block editor screen. */
@@ -1231,12 +2122,18 @@ interface TradeOffer {
 interface VillagerInventory extends Inventory {
     /** The experience needed for the next trade level. @since 0.2.0 @mc * */
     readonly futureTraderXp: number;
+    /** Whether the trader screen shows its level progress bar; undefined without an open trader screen. @since 0.5.0 @mc * */
+    readonly leveled: boolean;
     /** The trader's current trade level (1-5). @since 0.2.0 @mc * */
     readonly traderLevel: number;
     /** The trader's accumulated experience. @since 0.2.0 @mc * */
     readonly traderXp: number;
     /** The trade offers currently shown. @since 0.2.0 @mc * */
     readonly trades: Array<TradeOffer>;
+    /** Whether the trader offers a restock; undefined without an open trader screen. @since 0.5.0 @mc * */
+    canRestock(): boolean;
+    /** Selects a trade by its zero-based position in , highlighting it and requesting it from the server; an out-of-range index or a closed trader screen is a no-op. @since 0.5.0 @mc * */
+    selectTrade(index: number): Promise<void>;
 }
 
 /** The end-poem (credits) screen. */
@@ -1253,30 +2150,43 @@ interface XpInfo {
     readonly total: number;
 }
 
-/** The neo.reflect module: meta-level tools for the escape layer. Where neo.java proxies objects, this module resolves exact signatures (including private members), invokes reflectively, and constructs instances. The whole module rides the java permission gate. */
-interface ReflectApi {
-    /** The fully-qualified class name of any Java value (works on non-proxied values too), or undefined for undefined/null. @since 0.2.0 @mc * */
-    className(value: JsonValue | JavaObject): string;
-    /** Resolves one declared field, including private fields. Returns the java.lang.reflect.Field proxy, or undefined on a miss. @since 0.2.0 @mc * */
-    field(target: JavaObject | JavaClass, name: string): JavaObject;
-    /** Invokes one resolved reflect method. Omitting the target invokes a static method; numeric arguments convert to the declared parameter types. @since 0.2.0 @mc * */
-    invoke(method: JavaObject, target?: JavaObject, args?: Array<JsonValue | JavaObject>): JsonValue | JavaObject;
-    /** Resolves one declared method with an exact parameter signature, including private overloads. Parameter types arrive as an array of class-name strings or JavaClass values. Returns the java.lang.reflect.Method proxy, or undefined on a miss. @since 0.2.0 @mc * */
-    method(target: JavaObject | JavaClass, name: string, paramTypes: Array<string | JavaClass>): JavaObject;
-    /** Reflectively constructs one instance of the class with the matching constructor. @since 0.2.0 @mc * */
-    newInstance(cls: JavaClass | string, args?: Array<JsonValue | JavaObject>): JavaObject;
+interface EnchantmentData {
+    id: string;
+    level: number;
 }
 
-/** The neo.render module: world-space shape drawing on top of the vanilla gizmo pipeline. Shapes persist across frames until cleared or the module unloads; coordinates are world coordinates. */
+/** The neo.reflect module: meta-level tools for the escape layer. Where neo.java proxies objects, this module resolves exact signatures (including private members) into ReflectClass / ReflectField / ReflectMethod / ReflectConstructor handles — the java.lang.reflect surface of fields, methods, constructors, modifiers and annotations — and invokes reflectively. The whole module rides the java permission gate. */
+interface ReflectApi {
+    /** The fully-qualified class name of any Java value (works on non-proxied values too); reflect handles unwrap to what they wrap. Undefined for undefined/null. @since 0.2.0 @mc * */
+    className(value: JsonValue | JavaObject): string;
+    /** The class handle of any Java value (obj.getClass() equivalent) — a class value answers itself. Undefined for undefined/null. @since 0.7.0 @mc * */
+    classOf(value: JsonValue | JavaObject): ReflectClass;
+    /** Resolves one declared constructor with an exact parameter signature, including private constructors. Parameter types arrive as an array of class-name strings or ReflectClass values. Returns the ReflectConstructor handle, or undefined on a miss. @since 0.7.0 @mc * */
+    constructor(target: ReflectClass | JavaObject | JavaClass, paramTypes?: Array<string | JavaClass | ReflectClass>): ReflectConstructor;
+    /** Resolves one declared field, including private fields. Returns the ReflectField handle, or undefined on a miss. @since 0.2.0 @mc * */
+    field(target: ReflectClass | JavaObject | JavaClass, name: string): ReflectField;
+    /** Loads one class by name through the mapping layer as a ReflectClass handle — the Class.forName entry point of the reflection surface. @since 0.7.0 @mc * */
+    forName(name: string): ReflectClass;
+    /** Invokes one resolved reflect method. Omitting the target invokes a static method; numeric arguments convert to the declared parameter types. @since 0.2.0 @mc * */
+    invoke(method: JavaObject, target?: JavaObject, args?: Array<JsonValue | JavaObject>): JsonValue | JavaObject;
+    /** Resolves one declared method with an exact parameter signature, including private overloads. Parameter types arrive as an array of class-name strings or ReflectClass values. Returns the ReflectMethod handle, or undefined on a miss. @since 0.2.0 @mc * */
+    method(target: ReflectClass | JavaObject | JavaClass, name: string, paramTypes?: Array<string | JavaClass | ReflectClass>): ReflectMethod;
+    /** Reflectively constructs one instance of the class with the matching constructor — or, given a ReflectConstructor handle from constructor(), that exact constructor. @since 0.2.0 @mc * */
+    newInstance(cls: ReflectClass | JavaClass | string | ReflectConstructor, args?: Array<JsonValue | JavaObject>): JavaObject;
+}
+
+/** The neo.render module: world-space shape drawing on top of the vanilla gizmo pipeline. Two faces share one layer model: the immediate primitives (//…) accumulate fire-and-forget shapes per layer, and hands out retained overlays whose elements are mutable handles. Shapes persist across frames until cleared or the module unloads; coordinates are world coordinates. Layers are keyed per module owner (<module>:<id>); a module's layers are cleared automatically when it unloads. Owner-less callers (console, host code) keep the bare id, matching pre-owner behaviour. */
 interface RenderApi {
-    /** Removes all shapes on one layer. @since 0.1.0 @mc * */
+    /** Every overlay this module (or, without an owner, any caller) has touched, sorted by layer key. Layers stay listed after — an empty layer is still a layer. @since 0.5.0 @mc * */
+    layers: Array<Draw3D>;
+    /** Removes all shapes on one layer. Layers with no shapes yet are left untouched — clearing never creates a layer. @since 0.1.0 @mc * */
     clearLayer(layerId: string): void;
     /** Draws a wireframe box between two world positions on one layer. @since 0.1.0 @mc * */
     drawBox(layerId: string, min: Pos3D, max: Pos3D, argbColor: number): void;
     /** Draws a line between two world positions on one layer. @since 0.1.0 @mc * */
     drawLine(layerId: string, from: Pos3D, to: Pos3D, argbColor: number): void;
-    /** Lists all layers that currently hold shapes. @since 0.1.0 @mc * */
-    layerIds(): Array<string>;
+    /** Returns (creating if needed) the retained overlay for one layer id. Idempotent per owner: the same module calling with the same id always gets the same handle, while two modules with the same public id get isolated layers. @since 0.5.0 @mc * */
+    layer(id: string): Draw3D;
     /** Draws a filled convex surface through three or more vertices (a fan from the first point on modern nodes; an outlined polygon on 1.x). @since 0.2.0 @mc * */
     surface(layerId: string, points: Array<Pos3D>, argbColor: number): void;
     /** Draws a live line from the local player's eyes to the entity, kept aimed at it every frame while the entity stays loaded. @since 0.2.0 @mc * */
@@ -1321,8 +2231,10 @@ interface ThreadApi {
 interface WorldApi {
     /** The total world age in ticks. @since 0.1.0 @mc * */
     readonly age: number;
-    /** The boss bars currently displayed as [{uuid, name, progress, color}]; empty list when none. @since 0.2.0 @mc * */
-    readonly bossBars: Array<BossBarSnapshot>;
+    /** The boss bars currently displayed as [{uuid, name, progress, color, style, colorValue, colorFormat}]; empty list when none. @since 0.2.0 @mc * */
+    readonly bossBars: Array<BossBarInfoData>;
+    /** The objective shown in the current sidebar: the local player's team-colour sidebar when that slot holds one, otherwise the plain sidebar; undefined when neither slot is set or no world is loaded. @since 0.5.0 @mc * */
+    readonly currentScoreboard: ScoreboardObjectiveData;
     /** The current day count. @since 0.1.0 @mc * */
     readonly day: number;
     /** The difficulty identifier, e.g. normal. @since 0.1.0 @mc * */
@@ -1333,12 +2245,26 @@ interface WorldApi {
     readonly levelName: string;
     /** The current moon phase index (0 = full moon, 4 = new moon). @since 0.2.0 @mc * */
     readonly moonPhase: number;
+    /** The local player's team, or null when the local player or their team is absent. @since 0.5.0 @mc * */
+    readonly playerTeam: TeamData;
+    /** The local player's team colour index: 0 is black and 15 is white, -1 when the local player has no team or no colour. @since 0.5.0 @mc * */
+    readonly playerTeamColorIndex: number;
     /** Whether rain is currently falling. @since 0.1.0 @mc * */
     readonly raining: boolean;
+    /** The world spawn or respawn-data position as a BlockPos, or null without a loaded world. This is the position the level records for respawning; it does not predict where the player will eventually respawn. @since 0.7.0 @mc * */
+    readonly respawnPos: BlockPos;
     /** The client scoreboard as {objectives, scores}; objectives carry name, displayName, criteria, renderType, scores carry objective, owner, value, or null without a world. @since 0.2.0 @mc * */
     readonly scoreboards: ScoreboardData;
-    /** The client tab list as {header, footer, entries}; entries carry uuid, name, latency, gamemode, displayName, or null without a world. @since 0.2.0 @mc * */
-    readonly tabList: TabListData;
+    /** The client tab list as {header, footer, entries}; entries carry uuid, name, latency, gamemode, displayName plus the profile facts (publicKey, skinTexture, skinUrl, capeTexture, elytraTexture, cape, slimModel, team), or null without a world. @since 0.2.0 @mc * */
+    readonly tabList: TabListInfoData;
+    /** The packed RGB value of the local player's team colour, -1 when the local player has no team or no colour. @since 0.5.0 @mc * */
+    readonly teamColor: number;
+    /** The text formatting of the local player's team colour as its name, e.g. red; reset when the team carries no colour, null when the local player has no team. @since 0.5.0 @mc * */
+    readonly teamColorFormatting: string;
+    /** The color name of the local player's team, e.g. red; reset when the team carries no colour, null when the local player has no team. @since 0.5.0 @mc * */
+    readonly teamColorName: string;
+    /** The scoreboard teams known to the client; empty list without a world. @since 0.5.0 @mc * */
+    readonly teams: Array<TeamData>;
     /** Whether thunder is currently falling. @since 0.1.0 @mc * */
     readonly thundering: boolean;
     /** The world time of day in ticks. @since 0.1.0 @mc * */
@@ -1353,35 +2279,87 @@ interface WorldApi {
     chunkAt(x: number, y: number, z: number): Chunk;
     /** Whether the chunk is loaded. @since 0.2.0 @mc * */
     chunkLoaded(chunk: ChunkPos): boolean;
-    /** Scans the cube around the center for blocks matching one of the given block ids and returns their positions as Block handles. The scan range is capped at 32 blocks and the result at 512 entries to keep the main thread responsive; unknown ids are ignored. @since 0.2.0 @mc * */
+    /** Scans the cube (or sphere) around the center for blocks matching the given block ids or id glob pattern, optionally filtered by block state properties, and returns their positions as Block handles. The scan range is capped at 48 blocks and the result at 1024 entries to keep the main thread responsive; unknown ids are ignored. @since 0.2.0 @mc * */
     findBlocks(options: FindBlocksOptions): Array<Block>;
+    /** The objective in a team-colour sidebar: index 0 is black and 15 is white; negative or larger indices and empty slots read undefined. @since 0.5.0 @mc * */
+    getObjectiveForTeamColorIndex(index: number): ScoreboardObjectiveData;
+    /** The objective in one display slot: 0 is the tab list, 1 the sidebar, 2 below-name, and 3-18 the team-colour sidebars (black to white); out-of-range indices and empty slots read undefined. @since 0.5.0 @mc * */
+    getObjectiveSlot(slot: number): ScoreboardObjectiveData;
+    /** The team of one player, or null when the player or their team is absent. @since 0.5.0 @mc * */
+    getPlayerTeam(player: Player): TeamData;
+    /** The team colour index of one player: 0 is black and 15 is white, -1 when the player has no team or no colour. @since 0.5.0 @mc * */
+    getPlayerTeamColorIndex(player: Player): number;
+    /** The packed RGB value of one player's team colour, -1 when the player has no team or no colour. @since 0.5.0 @mc * */
+    getTeamColor(player: Player): number;
+    /** The text formatting of one player's team colour as its name, e.g. red; reset when the team carries no colour, null when the player has no team. @since 0.5.0 @mc * */
+    getTeamColorFormatting(player: Player): string;
+    /** The color name of one player's team, e.g. red; reset when the team carries no colour, null when the player has no team. @since 0.5.0 @mc * */
+    getTeamColorName(player: Player): string;
+    /** The light levels at the block position as {sky, block}, each layer reading 0 to 15, or null without a loaded world. The two layers are independent; sky light does not account for time-of-day or weather darkening. @since 0.7.0 @mc * */
+    lightAt(x: number, y: number, z: number): LightData;
     /** Whether the chunk containing the position is loaded. @since 0.1.0 @mc * */
     loaded(x: number, y: number, z: number): boolean;
     /** Plays a sound locally. With coordinates the sound plays at the world position (requires a loaded world); otherwise it plays through the UI sound channel. Unknown identifiers throw. @since 0.2.0 @mc * */
     playSound(soundId: string, x: number, y: number, z: number, volume: number, pitch: number): void;
+    /** Plays an audio file through the host sound mixer and resolves once playback starts. Unlike playSound, which plays registered sound events through the game sound engine (positional, honoring game volume settings), this plays the file itself outside the game sound engine. The path may be absolute or relative to the game directory. Volume is 0..1 mapped onto the mixer's master-gain range. The promise rejects when the file cannot be read, decoded, or played. @since 0.7.0 @mc * */
+    playSoundFile(path: string, volume: number): Promise<void>;
     /** Casts a ray from one point toward another and returns the first hit, or null when unobstructed or no world is loaded. @since 0.1.0 @mc * */
     raycast(fromX: number, fromY: number, fromZ: number, toX: number, toY: number, toZ: number): RayHit;
+    /** Starts a large-volume block scan with the same matching rules as findBlocks and resolves the promise with the matched Block handles. The scan runs in per-tick slices on the main thread (about 4 ms per tick), so big volumes never stall the frame: the range may go up to 256 (16-million-block volume budget) with up to 65536 results and a 10-second deadline. When center is omitted the local player position is used. At most four scans run at once; the promise rejects when the budget is exceeded, the deadline passes, or the world changes mid-scan. @since 0.5.0 @mc * */
+    scanBlocks(options: ScanBlocksOptions): Promise<Array<Block>>;
     /** Spawns particles locally around the position; unknown identifiers or data-carrying particle types throw. @since 0.2.0 @mc * */
     spawnParticle(particleId: string, x: number, y: number, z: number, count: number, offsetX: number, offsetY: number, offsetZ: number, speed: number): void;
 }
 
-/** One findBlocks scan: the block ids (string or string array), the center position, the scan range, and the result cap. */
+/** One findBlocks scan: the block ids (string or string array) or id glob pattern, the state-property filters, the center position, the scan range, the result cap, and the shape. */
 interface FindBlocksOptions {
-    /** center @since 0.2.0 @mc * */
+    /** center @since 0.5.0 @mc * */
     readonly center: { x: number; y: number; z: number };
-    /** limit @since 0.2.0 @mc * */
+    /** idPattern @since 0.5.0 @mc * */
+    readonly idPattern: string;
+    /** limit @since 0.5.0 @mc * */
     readonly limit: number;
-    /** range @since 0.2.0 @mc * */
+    /** range @since 0.5.0 @mc * */
     readonly range: number;
-    /** types @since 0.2.0 @mc * */
+    /** shape @since 0.5.0 @mc * */
+    readonly shape: "cube" | "sphere";
+    /** states @since 0.5.0 @mc * */
+    readonly states: Record<string, string | number | boolean>;
+    /** types @since 0.5.0 @mc * */
     readonly types: string | Array<string>;
 }
 
-interface BossBarSnapshot {
+/** One scanBlocks scan: the same filters and shape as findBlocks with a much larger range budget; the center defaults to the local player. */
+interface ScanBlocksOptions {
+    /** center @since 0.5.0 @mc * */
+    readonly center: { x: number; y: number; z: number };
+    /** idPattern @since 0.5.0 @mc * */
+    readonly idPattern: string;
+    /** limit @since 0.5.0 @mc * */
+    readonly limit: number;
+    /** range @since 0.5.0 @mc * */
+    readonly range: number;
+    /** shape @since 0.5.0 @mc * */
+    readonly shape: "cube" | "sphere";
+    /** states @since 0.5.0 @mc * */
+    readonly states: Record<string, string | number | boolean>;
+    /** types @since 0.5.0 @mc * */
+    readonly types: string | Array<string>;
+}
+
+interface BossBarInfoData {
     color: string;
+    colorFormat: string;
+    colorValue: number;
     name: string;
     progress: number;
+    style: string;
     uuid: string;
+}
+
+interface LightData {
+    block: number;
+    sky: number;
 }
 
 interface ObjectiveData {
@@ -1402,18 +2380,47 @@ interface ScoreboardData {
     scores: Array<ScoreEntryData>;
 }
 
-interface TabListData {
-    entries: Array<TabListEntry>;
+interface ScoreboardObjectiveData {
+    criteria: string;
+    displayName: string;
+    knownPlayers: Array<string>;
+    knownPlayersDisplayNames: Array<string>;
+    name: string;
+    playerScores: Record<string, number>;
+    renderType: string;
+    scoreToDisplayName: Record<number, string>;
+    texts: Array<string>;
+}
+
+interface TabListEntryInfoData {
+    cape: boolean;
+    capeTexture: string;
+    displayName: string;
+    elytraTexture: string;
+    gamemode: string;
+    latency: number;
+    name: string;
+    publicKey: Uint8Array;
+    skinTexture: string;
+    skinUrl: string;
+    slimModel: boolean;
+    team: TeamData;
+    uuid: string;
+}
+
+interface TabListInfoData {
+    entries: Array<TabListEntryInfoData>;
     footer: string;
     header: string;
 }
 
-interface TabListEntry {
+interface TeamData {
+    colorIndex: number;
+    colorName: string;
+    colorValue: number;
     displayName: string;
-    gamemode: string;
-    latency: number;
     name: string;
-    uuid: string;
+    players: Array<string>;
 }
 
 interface TpsData {
@@ -1443,7 +2450,7 @@ interface StateEvent extends BaseEvent {
     readonly direction: 'local';
 }
 
-/** Payload of the action-bar display event; synchronous subscribers may cancel the message (true) or return {text: "..."} to replace it. */
+/** Payload of the action-bar display event; synchronous subscribers may cancel the message or rewrite text before it renders. */
 interface ChatActionbarEvent extends DisplayEvent {
     readonly source: string;
     readonly text: TextComponent;
@@ -1463,7 +2470,7 @@ interface ChatReceiveEvent extends DisplayEvent {
     readonly message: TextComponent;
 }
 
-/** Payload of the outgoing chat message event; synchronous subscribers may cancel the send. */
+/** Payload of the outgoing chat message event; synchronous subscribers may cancel the send or rewrite message before it goes on the wire. */
 interface ChatSendEvent extends InputEvent {
     readonly message: string;
 }
@@ -1477,7 +2484,7 @@ interface MutableChatSendEvent extends ChatSendEvent {
     cancelled: boolean;
 }
 
-/** Payload of the title display event (main title or subtitle); synchronous subscribers may cancel the display (true) or return {text: "..."} to replace the text. */
+/** Payload of the title display event (main title or subtitle); synchronous subscribers may cancel the display or rewrite text before it renders. */
 interface ChatTitleEvent extends DisplayEvent {
     readonly kind: string;
     readonly text: TextComponent;
@@ -1505,16 +2512,25 @@ interface DialogOpenEvent extends StateEvent {
     readonly title: string;
 }
 
-/** Payload of the entity damage event; fires when a tracked entity takes damage. */
+/** Payload of the entity custom-name change event; fires when a tracked entity's custom name differs from the previous sample. oldName and newName are null when no custom name was set (a cleared name reports null in newName). The entity live handle is not part of the frozen payload; the identity face is uuid, and the live handle re-fetches through the entity API lookup. */
+interface EntityCustomNameEvent extends StateEvent {
+    readonly newName: string;
+    readonly oldName: string;
+    readonly uuid: string;
+}
+
+/** Payload of the entity damage event; fires when a tracked entity takes damage. health is the entity's health after the loss. */
 interface EntityDamageEvent extends StateEvent {
     readonly amount: number;
     readonly entity: EntitySnapshot;
+    readonly health: number;
 }
 
-/** Payload of the entity heal event. */
+/** Payload of the entity heal event; health is the entity's health after the gain. */
 interface EntityHealEvent extends StateEvent {
     readonly amount: number;
     readonly entity: EntitySnapshot;
+    readonly health: number;
 }
 
 /** Payload of the entity load event; fires when an entity enters the client's tracked range. */
@@ -1535,6 +2551,12 @@ interface EntityUnloadEvent extends StateEvent {
 
 /** Raised when the game client is shutting down. */
 interface GameQuitEvent extends StateEvent {
+}
+
+/** Payload of the resource pack reload event; fires when a client resource reload completes and the loading overlay begins fading out. The overlay is still visible when the event fires. isGameStart marks the initial startup load (the boot overlay runs without a fade-in); every later reload reports false. loadedPacks copies the repository's selected pack identifiers at fire time; later selection changes do not update the list. */
+interface GameResourcePackEvent extends StateEvent {
+    readonly isGameStart: boolean;
+    readonly loadedPacks: Array<string>;
 }
 
 /** Raised when the game client has finished starting. */
@@ -1562,13 +2584,22 @@ interface InputWheelEvent extends StateEvent {
     readonly amount: number;
 }
 
-/** Payload of the inventory click event, fired after a container slot click is processed (manual clicks and script-issued clicks share the path). */
-interface InventoryClickEvent extends StateEvent {
+/** Payload of the container slot click event, raised before the click is handed to the game mode so synchronous subscribers can cancel it: a cancelled click never sends its packet and no slot changes. Manual clicks and script-issued clicks share the path, so a script's own inventory.click call is cancellable too. */
+interface InventoryClickEvent extends InputEvent {
     readonly button: number;
     readonly containerId: number;
     readonly kind: string;
+    readonly mode: string;
     readonly shift: boolean;
     readonly slot: number;
+}
+
+/** Synchronous-channel delivery of the inventory:click event: whitelisted fields are writable, and cancel()/cancelled drive the cancellation state. */
+interface MutableInventoryClickEvent extends InventoryClickEvent {
+    /** Marks the event canceled (later priorities may undo it). */
+    cancel(): void;
+    /** Current cancellation state; writable — the last write wins. */
+    cancelled: boolean;
 }
 
 /** Payload of the inventory close event, fired when an open container screen closes. */
@@ -1577,20 +2608,85 @@ interface InventoryCloseEvent extends StateEvent {
     readonly title: string;
 }
 
-/** Payload of the inventory open event, fired when a container screen opens (the player inventory screen included, kind player). */
+/** Payload of the slot drop event, raised before the drop is applied so synchronous subscribers can cancel it. Covers both drop paths: the menu THROW click (slot is the menu slot, -999 for a click outside the window) and the hotbar Q key (slot is 36 + hotbar index, kind player). */
+interface InventoryDropSlotEvent extends InputEvent {
+    readonly all: boolean;
+    readonly kind: string;
+    readonly slot: number;
+}
+
+/** Synchronous-channel delivery of the inventory:dropSlot event: whitelisted fields are writable, and cancel()/cancelled drive the cancellation state. */
+interface MutableInventoryDropSlotEvent extends InventoryDropSlotEvent {
+    /** Marks the event canceled (later priorities may undo it). */
+    cancel(): void;
+    /** Current cancellation state; writable — the last write wins. */
+    cancelled: boolean;
+}
+
+/** Payload of the inventory open event, fired when a container screen opens (the player inventory screen included, kind player). Synchronous subscribers may cancel it; a cancelled open closes the container right away, so the server stays authoritative (the container may exist for at most one client tick). screen is the MC class name of the opening screen; it is absent when no screen snapshot is available. */
 interface InventoryOpenEvent extends StateEvent {
     readonly containerId: number;
     readonly kind: string;
+    readonly screen: string;
     readonly size: number;
     readonly title: string;
 }
 
-/** Payload of the inventory update event, fired on every server slot sync: single-slot updates (mode slot) and full menu resyncs (mode all). Menu id 0 covers the player inventory while no container screen is open, so item pickup and crafting surface here too. */
+/** Synchronous-channel delivery of the inventory:open event: whitelisted fields are writable, and cancel()/cancelled drive the cancellation state. */
+interface MutableInventoryOpenEvent extends InventoryOpenEvent {
+    /** Marks the event canceled (later priorities may undo it). */
+    cancel(): void;
+    /** Current cancellation state; writable — the last write wins. */
+    cancelled: boolean;
+}
+
+/** Payload of the inventory update event, fired on every server slot sync: single-slot updates (mode slot) with the previous and incoming stacks, full menu resyncs (mode all) without stack data, and cursor-stack syncs (mode held). Menu id 0 covers the player inventory while no container screen is open, so item pickup and crafting surface here too. Fired before the menu applies the incoming stack, so synchronous readers still see the previous state. screen is the MC class name of the screen open while the sync lands; it is absent when no screen is open (a player-inventory resync with no screen open reports no screen). */
 interface InventoryUpdateEvent extends StateEvent {
     readonly containerId: number;
     readonly kind: string;
     readonly mode: string;
+    readonly newStack: ItemStack;
+    readonly oldStack: ItemStack;
+    readonly screen: string;
     readonly slot: number;
+}
+
+/** Payload of the item durability change event: the same item in one slot kept its identity but changed durability (mining, combat, armor wear). damage is the current durability value, not the delta. Only the durability axis is reported here; other stack changes keep flowing through the held-item and armor events. */
+interface ItemDamageEvent extends StateEvent {
+    readonly damage: number;
+    readonly item: ItemStack;
+    readonly slot: string;
+}
+
+/** Payload of the item pickup event, fired while the client processes a pickup packet and before the inventory is updated. item is a snapshot whose count is the picked-up amount; mutating it does not change the dropped stack or the inventory. */
+interface ItemPickupEvent extends StateEvent {
+    readonly amount: number;
+    readonly item: ItemStack;
+}
+
+/** Payload of the incoming-packet observation, published on the game main thread before the packet is handled. The event is an observation only: it is not cancellable and carries no raw packet object, so every subscriber sees the same frozen face regardless of permissions. id is the namespaced packet id, flow is the packet's own direction (clientbound / serverbound) and protocol is the connection's current phase. buffer is undefined when the packet has no standalone codec (bundles and other codec-less packets); the read-only cell stays readable after the event returns. */
+interface PacketReceiveEvent extends DisplayEvent {
+    readonly buffer: PacketBuffer;
+    readonly flow: string;
+    readonly id: string;
+    readonly protocol: string;
+}
+
+/** Payload of the outgoing-packet interception, fired at the connection's single send funnel before the packet reaches the wire. Synchronous subscribers may cancel the send (a cancelled packet never leaves the client) or rewrite buffer in place; the adapter re-decodes the edited bytes and fails open when they no longer decode. The buffer write window closes as soon as the synchronous dispatch returns: writes inside the callback are applied to the packet, writes after it raise. Reading keeps working for the lifetime of the cell. buffer is undefined when the packet has no standalone codec; a packet without a buffer can still be cancelled. */
+interface PacketSendEvent extends InputEvent {
+    readonly buffer: PacketBuffer;
+    readonly flow: string;
+    readonly id: string;
+    readonly protocol: string;
+}
+
+/** Synchronous-channel delivery of the packet:send event: whitelisted fields are writable, and cancel()/cancelled drive the cancellation state. */
+interface MutablePacketSendEvent extends PacketSendEvent {
+    buffer: PacketBuffer;
+    /** Marks the event canceled (later priorities may undo it). */
+    cancel(): void;
+    /** Current cancellation state; writable — the last write wins. */
+    cancelled: boolean;
 }
 
 /** Payload of the local player air (breath) change event. */
@@ -1598,9 +2694,12 @@ interface PlayerAirEvent extends StateEvent {
     readonly air: number;
 }
 
-/** Payload of the armor change event; the four slots ride in feet, legs, chest, head order and empty slots read as minecraft:air. */
+/** Payload of the armor change event; the four slots ride in feet, legs, chest, head order and empty slots read as minecraft:air. One event is published per changed slot, so slot, item and oldItem name the slot that moved while armor always carries the full current set. A durability-only change stays on item:damage and does not fire this event. */
 interface PlayerArmorEvent extends StateEvent {
     readonly armor: Array<ItemStack>;
+    readonly item: ItemStack;
+    readonly oldItem: ItemStack;
+    readonly slot: string;
 }
 
 /** Payload of the block attack (start breaking) event; synchronous subscribers may cancel the break. */
@@ -1636,8 +2735,10 @@ interface PlayerDamageEvent extends StateEvent {
     readonly health: number;
 }
 
-/** Payload of the local player death event. */
+/** Payload of the local player death event; deathPos is the block the player occupied when the death edge was observed and inventory is the point-in-time snapshot of every non-empty inventory stack (an empty inventory reads as an empty list, never null). */
 interface PlayerDeathEvent extends StateEvent {
+    readonly deathPos: BlockPos;
+    readonly inventory: Array<ItemStack>;
     readonly player: EntitySnapshot;
 }
 
@@ -1647,18 +2748,23 @@ interface PlayerDimensionChangeEvent extends StateEvent {
     readonly to: string;
 }
 
-/** Payload of the status effect change event; fires when the local player gains or loses a status effect. */
+/** Payload of the status effect change event; fires when the local player gains or loses a status effect. previousEffect is the effect as it stood before this update: null on a gain, the replaced effect on an amplifier change, and the removed effect on a removal (where added is false and the new state is absent). */
 interface PlayerEffectEvent extends StateEvent {
     readonly added: boolean;
     readonly amplifier: number;
     readonly effectId: string;
+    readonly previousEffect: EffectSnapshot;
 }
 
-/** Payload of the experience change event. */
+/** Payload of the experience change event; fires when the level or the total experience points move. The prev fields hold the values of the previous sample, so a level-up reads as a prevLevel gap and a plain gain as a prevTotal gap. */
 interface PlayerExpEvent extends StateEvent {
     readonly change: number;
     readonly level: number;
+    readonly prevLevel: number;
+    readonly prevProgress: number;
+    readonly prevTotal: number;
     readonly progress: number;
+    readonly total: number;
 }
 
 /** Payload of the gamemode change event. */
@@ -1678,14 +2784,16 @@ interface PlayerHealEvent extends StateEvent {
     readonly health: number;
 }
 
-/** Payload of the local player health change event. */
+/** Payload of the local player health change event; change is the signed difference against the previous sample (positive for a gain, negative for a loss). */
 interface PlayerHealthEvent extends StateEvent {
+    readonly change: number;
     readonly health: number;
 }
 
-/** Payload of the held item change event. */
+/** Payload of the held item change event; the main hand and the off hand are tracked separately and offHand names which one moved. The stacks are the point-in-time snapshots of the two hands around the change, and a stack that was empty reads as null (undefined to scripts). */
 interface PlayerHeldItemEvent extends StateEvent {
     readonly current: ItemStack;
+    readonly offHand: boolean;
     readonly previous: ItemStack;
 }
 
@@ -1737,8 +2845,9 @@ interface PlayerRespawnEvent extends StateEvent {
     readonly player: EntitySnapshot;
 }
 
-/** Payload of the riding change event; the vehicle snapshot is null when the player dismounted. */
+/** Payload of the riding change event; the vehicle snapshot is null when the player dismounted. previousVehicle carries the mirror image: the vehicle left behind on a dismount, null when the player mounted from foot. */
 interface PlayerRidingEvent extends StateEvent {
+    readonly previousVehicle: EntitySnapshot;
     readonly vehicle: EntitySnapshot;
 }
 
@@ -1778,11 +2887,12 @@ interface ScreenOpenEvent extends StateEvent {
     readonly title: string;
 }
 
-/** Payload of the sign-edit open event; synchronous subscribers may cancel the editor, rewrite the four lines, or set closeScreen to submit the (possibly replaced) text directly instead of opening the editor. */
+/** Payload of the sign-edit open event; synchronous subscribers may cancel the editor, rewrite the four lines, or set closeScreen to submit the (possibly replaced) text directly instead of opening the editor. pos repeats x/y/z as one block-grid position handle. */
 interface ScreenSignEditEvent extends DisplayEvent {
     readonly closeScreen: boolean;
     readonly front: boolean;
     readonly lines: Array<string>;
+    readonly pos: BlockPos;
     readonly x: number;
     readonly y: number;
     readonly z: number;
@@ -1861,8 +2971,24 @@ interface WorldWeatherEvent extends StateEvent {
     readonly thundering: boolean;
 }
 
-/** The chested-horse base (donkeys, mules, llamas); the chest state accessor is not public and rides the follow-up batch. */
+interface EffectSnapshot {
+    amplifier: number;
+    duration: number;
+    effectId: string;
+}
+
+/** Abstract arrow base: crit and piercing state. */
+interface AbstractArrowEntity extends ProjectileEntity {
+    /** Whether the arrow is a critical hit arrow. @since 0.5.0 @mc * */
+    readonly critical: boolean;
+    /** The piercing level (0 for non-piercing shots). @since 0.5.0 @mc * */
+    readonly pierceLevel: number;
+}
+
+/** The chested-horse base (donkeys, mules, llamas) with the chest state. */
 interface AbstractChestedHorseEntity extends AbstractHorseEntity {
+    /** Whether a chest is attached to this animal. @since 0.5.0 @mc * */
+    hasChest(): boolean;
 }
 
 /** The fish base: bucket-birth state. */
@@ -1879,8 +3005,26 @@ interface AbstractHorseEntity extends AnimalEntity {
     readonly eating: boolean;
     /** The saddle inventory slot count. @since 0.2.0 @mc * */
     readonly inventorySize: number;
+    /** The owning player handle, or undefined when ownerless. @since 0.5.0 @mc * */
+    readonly owner: Entity;
+    /** Whether a saddle is currently equipped. @since 0.5.0 @mc * */
+    readonly saddled: boolean;
+    /** Whether the animal is rearing up on its hind legs (the standing flag; it is a pose, not an anger state). @since 0.5.0 @mc * */
+    readonly standing: boolean;
     /** Whether the horse is tamed. @since 0.2.0 @mc * */
     readonly tamed: boolean;
+}
+
+/** Illager base: the arm pose shared by pillagers, vindicators, evokers, and witches. */
+interface AbstractIllagerEntity extends MobEntity {
+    /** The current arm pose (e.g. crossed, attacking, spellcasting, bow_and_arrow, celebrating, neutral). @since 0.5.0 @mc * */
+    readonly armPose: string;
+    /** Whether the illager is celebrating (raid victory celebration). @since 0.5.0 @mc * */
+    readonly celebrating: boolean;
+}
+
+/** Minecart base. */
+interface AbstractMinecartEntity extends Entity {
 }
 
 /** The schooling fish base: school membership. */
@@ -1891,6 +3035,50 @@ interface AbstractSchoolingFishEntity extends AbstractFishEntity {
     canBeFollowed(): boolean;
     /** Whether this fish leads a school with at least one follower. @since 0.2.0 @mc * */
     hasFollowers(): boolean;
+}
+
+/** Skeleton of the script control builders (G-036): the common fluent chain (id/x/y/pos/width/height/size/zIndex/message/active/visible) plus the terminal that assembles a validated (G-003 §5.2). Concrete builders contribute their type-specific fields through . G-003 §5.2 rules honored here: builders are root-constructed (new neo.ButtonBuilder()), chain setters use the noun word, and there is no getter readback on the builder — the engine would map a no-arg getX()/isX() to the same script property as the fluent x(int) method (one member per name), so readback lives on the product instead. G-036B completes the base face: alpha/moveTo plus the layout reads (getScaled… / getParent…), while the conflicting readbacks (getWidth/getX/isActive/…) stay compat-held on build(). */
+interface AbstractWidgetBuilder {
+    /** The host window height a built control aligns against (getParentHeight). @since 0.5.0 @mc * */
+    parentHeight: number;
+    /** The host window width a built control aligns against (getParentWidth); a root-constructed builder has no screen yet, so this reads the full-window extent its screen will have. @since 0.5.0 @mc * */
+    parentWidth: number;
+    /** The configured height alignment reads before build (getScaledHeight). @since 0.5.0 @mc * */
+    scaledHeight: number;
+    /** The configured x alignment reads before build (getScaledLeft). @since 0.5.0 @mc * */
+    scaledLeft: number;
+    /** The configured y alignment reads before build (getScaledTop). @since 0.5.0 @mc * */
+    scaledTop: number;
+    /** The configured width alignment reads before build (getScaledWidth). @since 0.5.0 @mc * */
+    scaledWidth: number;
+    /** Sets whether the control accepts input. @since 0.5.0 @mc * */
+    active(active: boolean): unknown;
+    /** Sets the alpha the built widget is drawn with, clamped to 0.0 (transparent) through 1.0 (opaque); the default is 1.0 (alpha). @since 0.5.0 @mc * */
+    alpha(alpha: number): unknown;
+    /** Assembles and validates the declarative control (createWidget → build()); add the result through . @since 0.5.0 @mc * */
+    build(): ControlSpec;
+    /** Sets the height. @since 0.5.0 @mc * */
+    height(height: number): unknown;
+    /** Sets the control id (auto-generated when omitted at ). @since 0.5.0 @mc * */
+    id(controlId: string): unknown;
+    /** Sets the label text. @since 0.5.0 @mc * */
+    message(message: string): unknown;
+    /** Sets both absolute coordinates (moveTo, the alignment helper). @since 0.5.0 @mc * */
+    moveTo(x: number, y: number): unknown;
+    /** Sets both absolute coordinates. @since 0.5.0 @mc * */
+    pos(x: number, y: number): unknown;
+    /** Sets both dimensions. @since 0.5.0 @mc * */
+    size(width: number, height: number): unknown;
+    /** Sets whether the control is drawn. @since 0.5.0 @mc * */
+    visible(visible: boolean): unknown;
+    /** Sets the width. @since 0.5.0 @mc * */
+    width(width: number): unknown;
+    /** Sets the absolute x position. @since 0.5.0 @mc * */
+    x(x: number): unknown;
+    /** Sets the absolute y position. @since 0.5.0 @mc * */
+    y(y: number): unknown;
+    /** Sets the in-screen draw/hit ordering key (ties break by declaration). @since 0.5.0 @mc * */
+    zIndex(z: number): unknown;
 }
 
 /** An allay: jukebox dance and held-item state. */
@@ -1907,10 +3095,18 @@ interface AllayEntity extends MobEntity {
 
 /** Breedable animal base (cows, sheep, cats, wolves, ...). */
 interface AnimalEntity extends MobEntity {
+    /** Whether the game's mating check accepts the other animal for this one; false when either handle is gone or either side is not an animal. @since 0.5.0 @mc * */
+    canBreedWith(other: AnimalEntity): boolean;
+    /** Whether this animal accepts the item with the id as food; the namespace defaults to minecraft. Unknown ids answer false. @since 0.5.0 @mc * */
+    isFood(itemId: string): boolean;
 }
 
 /** An area effect cloud: radius and waiting state. */
 interface AreaEffectCloudEntity extends Entity {
+    /** The packed 0xAARRGGBB particle colour, or -1 when the particle carries no colour. @since 0.5.0 @mc * */
+    readonly color: number;
+    /** The cloud particle type identifier, e.g. minecraft:effect. @since 0.5.0 @mc * */
+    readonly particle: string;
     /** The current cloud radius in blocks. @since 0.2.0 @mc * */
     readonly radius: number;
     /** The remaining wait time in ticks. @since 0.2.0 @mc * */
@@ -1929,10 +3125,34 @@ interface ArmadilloEntity extends AnimalEntity {
 
 /** An armor stand: the marker and small pose flags. */
 interface ArmorStandEntity extends MobEntity {
+    /** The body pose rotation triple (x, y, z) in degrees. @since 0.5.0 @mc * */
+    readonly bodyPose: Pos3D;
+    /** The head pose rotation triple (x, y, z) in degrees. @since 0.5.0 @mc * */
+    readonly headPose: Pos3D;
+    /** Whether the stand is invisible (the vanilla invisible flag). @since 0.5.0 @mc * */
+    readonly invisible: boolean;
+    /** The left arm pose rotation triple (x, y, z) in degrees. @since 0.5.0 @mc * */
+    readonly leftArmPose: Pos3D;
+    /** The left leg pose rotation triple (x, y, z) in degrees. @since 0.5.0 @mc * */
+    readonly leftLegPose: Pos3D;
     /** Whether the stand is a hitbox-less marker. @since 0.2.0 @mc * */
     readonly marker: boolean;
+    /** The right arm pose rotation triple (x, y, z) in degrees. @since 0.5.0 @mc * */
+    readonly rightArmPose: Pos3D;
+    /** The right leg pose rotation triple (x, y, z) in degrees. @since 0.5.0 @mc * */
+    readonly rightLegPose: Pos3D;
     /** Whether the stand uses the small pose. @since 0.2.0 @mc * */
     readonly small: boolean;
+    /** Whether the stand displays arms. @since 0.5.0 @mc * */
+    showArms(): boolean;
+    /** Whether the stand displays its base plate. @since 0.5.0 @mc * */
+    showBasePlate(): boolean;
+}
+
+/** An arrow: the tip potion color. */
+interface ArrowEntity extends AbstractArrowEntity {
+    /** The potion arrow color as packed RGB, or undefined for plain arrows. @since 0.5.0 @mc * */
+    readonly color: number;
 }
 
 /** An axolotl: variant, playing-dead state, and bucket origin. */
@@ -1943,6 +3163,8 @@ interface AxolotlEntity extends AnimalEntity {
     readonly playingDead: boolean;
     /** The variant identifier. @since 0.2.0 @mc * */
     readonly variant: string;
+    /** The numeric variant id matching the variant name. @since 0.5.0 @mc * */
+    readonly variantId: number;
 }
 
 /** A bat: roosting state. */
@@ -1953,6 +3175,8 @@ interface BatEntity extends MobEntity {
 
 /** A bee: nectar and sting state. */
 interface BeeEntity extends AnimalEntity {
+    /** Whether the bee is currently angry at a player. @since 0.5.0 @mc * */
+    readonly angry: boolean;
     /** Whether the bee is carrying nectar. @since 0.2.0 @mc * */
     hasNectar(): boolean;
     /** Whether the bee has stung a player. @since 0.2.0 @mc * */
@@ -1963,18 +3187,52 @@ interface BeeEntity extends AnimalEntity {
 interface Block {
     /** The biome identifier at the block position. @since 0.2.0 @mc * */
     readonly biome: string;
+    /** The block's explosion resistance factor. @since 0.5.0 @mc * */
+    readonly blastResistance: number;
     /** The chunk coordinate containing the block. @since 0.2.0 @mc * */
     readonly chunk: ChunkPos;
+    /** The item form of the block as a stack of one, or undefined when the block has no item. @since 0.5.0 @mc * */
+    readonly defaultItemStack: ItemStack;
+    /** The registered default state of the block type, or undefined when unloaded. @since 0.5.0 @mc * */
+    readonly defaultState: BlockState;
+    /** The jump boost multiplier applied when standing on the block. @since 0.5.0 @mc * */
+    readonly jumpVelocityMultiplier: number;
+    /** The block's translated display name. @since 0.5.0 @mc * */
+    readonly name: string;
     /** The block position. @since 0.1.0 @mc * */
     readonly pos: BlockPos;
     /** Escape hatch: the raw host block state object. Requires the java permission. @since 0.1.0 @mc * @requires permission 'java' */
     raw: JavaObject;
+    /** Escape hatch: the raw host block entity object at this position, or undefined when unloaded or the block carries none. Requires the java permission. @since 0.5.0 @mc * @requires permission 'java' */
+    rawBlockEntity: JavaObject;
+    /** The friction (slipperiness) value of the block. @since 0.5.0 @mc * */
+    readonly slipperiness: number;
     /** The current block state; undefined outside the loaded world. @since 0.1.0 @mc * */
     readonly state: BlockState;
+    /** Every possible state defined for the block, or undefined when unloaded. @since 0.5.0 @mc * */
+    readonly states: Array<BlockState>;
+    /** The full block tag identifiers assigned to the block, empty when unloaded or untagged. @since 0.5.0 @mc * */
+    readonly tags: Array<string>;
     /** Whether the block is still loaded in the world. @since 0.1.0 @mc * */
     valid: boolean;
+    /** The entity movement speed factor of the block. @since 0.5.0 @mc * */
+    readonly velocityMultiplier: number;
+    /** Whether mobs can spawn inside the block's default state (non-solid, non-liquid). @since 0.5.0 @mc * */
+    canMobSpawnInside(): boolean;
+    /** Whether the block's shape is marked dynamic. @since 0.5.0 @mc * */
+    hasDynamicBounds(): boolean;
+    /** Whether the block belongs to the block tag. Unknown tags and tags of other registries answer false; an unloaded world answers undefined. @since 0.5.0 @mc * */
+    hasTag(tag: string): boolean;
     /** The block n steps in one cardinal direction, or undefined outside the loaded world. @since 0.2.0 @mc * */
     relative(direction: string, n: number): Block;
+}
+
+/** A block display: the rendered block id. */
+interface BlockDisplayEntity extends DisplayEntity {
+    /** The rendered block identifier. @since 0.5.0 @mc * */
+    readonly block: string;
+    /** The full block state (identifier plus vanilla properties) the display renders; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly blockState: BlockState;
 }
 
 /** Immutable block-grid position: an integer with directional offsets. new BlockPos(10.7, 64.2, 200.9) floors onto the grid. */
@@ -2011,47 +3269,260 @@ interface BlockPos extends Pos3D {
 
 /** Immutable block state: the namespaced block identifier plus the vanilla state properties (facing, open, ...). */
 interface BlockState {
+    /** The axis name (x/y/z), or undefined without the property. @since 0.5.0 @mc * */
+    readonly axis: string;
+    /** The bed part (head/foot), or undefined without the property. @since 0.5.0 @mc * */
+    readonly bedPart: string;
     /** Whether lava can ignite the block. @since 0.2.0 @mc * */
     readonly burnable: boolean;
+    /** The chest type (single/left/right); undefined on non-chest blocks. @since 0.5.0 @mc * */
+    readonly chestType: string;
+    /** Whether the command block is conditional, or undefined without the property. @since 0.5.0 @mc * */
+    readonly conditional: boolean;
+    /** The repeater/comparator delay (1-4), or undefined without the property. @since 0.5.0 @mc * */
+    readonly delay: number;
+    /** The stability distance (vines/wool/sculk), or undefined without the property. @since 0.5.0 @mc * */
+    readonly distance: number;
+    /** The door hinge side (left/right), or undefined without the property. @since 0.5.0 @mc * */
+    readonly doorHinge: string;
+    /** Whether the hopper/crafter is enabled, or undefined without the property. @since 0.5.0 @mc * */
+    readonly enabled: boolean;
+    /** Whether the piston is extended, or undefined without the property. @since 0.5.0 @mc * */
+    readonly extended: boolean;
+    /** The attach face (floor/wall/ceiling), or undefined without the property. @since 0.5.0 @mc * */
+    readonly face: string;
+    /** The facing direction name (down/up/north/...), or undefined without the property. @since 0.5.0 @mc * */
+    readonly facing: string;
     /** The contained fluid identifier, or null when dry. @since 0.2.0 @mc * */
     readonly fluid: string;
+    /** The block half (top/bottom/upper/lower), or undefined without the property. @since 0.5.0 @mc * */
+    readonly half: string;
+    /** Whether the block hangs from the face above, or undefined without the property. @since 0.5.0 @mc * */
+    readonly hanging: boolean;
     /** The destroy hardness, or undefined for unbreakable blocks. @since 0.2.0 @mc * */
     readonly hardness: number;
+    /** The honey level (0-5), or undefined without the property. @since 0.5.0 @mc * */
+    readonly honeyLevel: number;
     /** The namespaced block identifier, e.g. minecraft:chest. @since 0.1.0 @mc * */
     readonly id: string;
+    /** The note-block instrument (harp/bell/...), or undefined without the property. @since 0.5.0 @mc * */
+    readonly instrument: string;
     /** Whether the state is one of the air blocks. @since 0.2.0 @mc * */
     isAir: boolean;
+    /** The current level value (fluid/cauldron/composter), or undefined without the property. @since 0.5.0 @mc * */
+    readonly level: number;
     /** Whether the state is a liquid (water or lava family). @since 0.2.0 @mc * */
     liquid: boolean;
     /** The block light emission level (0-15). @since 0.2.0 @mc * */
     readonly luminance: number;
+    /** The note-block pitch (0-24), or undefined without the property. @since 0.5.0 @mc * */
+    readonly note: number;
+    /** Whether the state is occupied (beds), or undefined without the property. @since 0.5.0 @mc * */
+    readonly occupied: boolean;
     /** Whether the state visually occludes the sky and neighbors. @since 0.2.0 @mc * */
     readonly opaque: boolean;
+    /** Whether the leaves are persistent, or undefined without the property. @since 0.5.0 @mc * */
+    readonly persistent: boolean;
     /** The piston push behaviour (lowercase, e.g. normal). @since 0.2.0 @mc * */
     readonly pistonBehaviour: string;
+    /** The piston-head type (normal/sticky); undefined on non-piston-head blocks. @since 0.5.0 @mc * */
+    readonly pistonType: string;
+    /** The redstone power level (0-15), or undefined without the property. @since 0.5.0 @mc * */
+    readonly power: number;
     /** The vanilla state properties. @since 0.1.0 @mc * */
     readonly props: Record<string, string>;
+    /** The rail shape (north_south/ascending_east/...); undefined on non-rail blocks. @since 0.5.0 @mc * */
+    readonly railShape: string;
     /** Whether the block can be replaced by placing into it. @since 0.2.0 @mc * */
     readonly replaceable: boolean;
+    /** The slab type (top/bottom/double); undefined on non-slab blocks. @since 0.5.0 @mc * */
+    readonly slabType: string;
+    /** Whether the state reports a snowy cover, or undefined without the property. @since 0.5.0 @mc * */
+    readonly snowy: boolean;
+    /** The legacy solid flag, distinct from opacity, or undefined without a world snapshot. @since 0.5.0 @mc * */
+    readonly solid: boolean;
+    /** The stair shape (straight/inner_left/...); undefined on non-stair blocks. @since 0.5.0 @mc * */
+    readonly stairShape: string;
     /** Whether this state suffocates entities standing inside it. @since 0.2.0 @mc * */
     readonly suffocating: boolean;
     /** Whether the correct tool is required for drops. @since 0.2.0 @mc * */
     readonly toolRequired: boolean;
+    /** Whether the state is waterlogged, or undefined without the property. @since 0.5.0 @mc * */
+    readonly waterlogged: boolean;
+    /** Whether the block state present at the position allows spawning the given entity type in the currently loaded world; undefined without a world, false for an unknown entity identifier. @since 0.5.0 @mc * */
+    allowsSpawning(x: number, y: number, z: number, entity: string): boolean;
+    /** The legacy movement-blocking flag (excludes cobwebs and bamboo saplings), or undefined when the state carries no world snapshot. @since 0.5.0 @mc * */
+    blocksMovement(): boolean;
     /** Whether the state emits redstone power. @since 0.2.0 @mc * */
     emitsRedstonePower(): boolean;
+    /** Whether the state has a large (exceeds-cube) collision shape. @since 0.5.0 @mc * */
+    exceedsCube(): boolean;
+    /** The value of one vanilla state property (e.g. facing, half), or undefined when the state has no such property. Lookup is case-insensitive; values keep their serialized spelling (east, bottom, inner_left, true). @since 0.5.0 @mc * */
+    getProp(name: string): string;
+    /** The [min, max] values one numeric state property can take (e.g. level 0-15), read from the block type's defined states; undefined when the block type is unknown or the property is absent or not numeric. @since 0.5.0 @mc * */
+    getPropRange(name: string): Array<number>;
     /** Whether the state carries a block entity. @since 0.2.0 @mc * */
     hasBlockEntity(): boolean;
+    /** Whether the state supports an analog (comparator) output signal. @since 0.5.0 @mc * */
+    hasComparatorOutput(): boolean;
+    /** Whether the state carries the given vanilla property. @since 0.5.0 @mc * */
+    hasProp(name: string): boolean;
     /** Whether the state receives random ticks. @since 0.2.0 @mc * */
     hasRandomTicks(): boolean;
+    /** Whether the state's block belongs to the block tag. Unknown tags and tags of other registries answer false; without a loaded registry answer undefined. @since 0.5.0 @mc * */
+    hasTag(tag: string): boolean;
     /** Whether the state's block matches the identifier (namespace optional). @since 0.1.0 @mc * */
     is(idOrPredicate: string): boolean;
     isProps(props: Record<string, string>): boolean;
+    /** Whether the block state present at the position suffocates entities standing inside it in the currently loaded world; undefined without a world. @since 0.5.0 @mc * */
+    shouldSuffocate(x: number, y: number, z: number): boolean;
+}
+
+/** A boat: submerged state. */
+interface BoatEntity extends Entity {
+    /** The boat's pick-result stack (the boat item), with a count of one. @since 0.5.0 @mc * */
+    readonly boatItem: ItemStack;
+    /** Whether the boat hull is fully under water. @since 0.5.0 @mc * */
+    readonly underWater: boolean;
+}
+
+/** Resolved absolute box of the element: the origin in scaled pixels plus the size after percentage resolution and , truncated toward zero. undefined once the handle is disposed. */
+interface Bounds {
+    /** height @since 0.5.0 @mc * */
+    readonly height: number;
+    /** width @since 0.5.0 @mc * */
+    readonly width: number;
+    /** x @since 0.5.0 @mc * */
+    readonly x: number;
+    /** y @since 0.5.0 @mc * */
+    readonly y: number;
+}
+
+/** Resolved absolute box of the element: the origin in scaled pixels plus the size after percentage resolution and , truncated toward zero. undefined once the handle is disposed. */
+interface Bounds {
+    /** height @since 0.5.0 @mc * */
+    readonly height: number;
+    /** width @since 0.5.0 @mc * */
+    readonly width: number;
+    /** x @since 0.5.0 @mc * */
+    readonly x: number;
+    /** y @since 0.5.0 @mc * */
+    readonly y: number;
+}
+
+/** An axis-aligned cuboid drawn in the world as an outline with an optional filled interior. Its geometry is two opposite corners (order retained); outline and fill colours are independent. This class is both the element and its builder (G-001 拍板②): obtain one from , configure it with the fluent setters, then to attach it — mutations after attachment re-project immediately. returns the box without attaching it. cull enables depth testing so terrain can hide the box; the default false draws it over the world. Colour handling: a packed colour whose alpha byte is zero but whose RGB is non-zero becomes opaque; fully transparent black stays transparent. keeps an explicit zero alpha. Packed parameters accept the full-range JS literals (0xFF00FF00) through a Java-side long. */
+interface Box extends RenderElement3D {
+    /** The outline alpha. @since 0.5.0 @mc * */
+    alpha: number;
+    /** The outline colour's low 24 bits; read alpha separately with . @since 0.5.0 @mc * */
+    color: number;
+    /** Whether the box is depth tested; false draws it over the world. @since 0.5.0 @mc * */
+    culled: boolean;
+    /** The fill alpha. @since 0.5.0 @mc * */
+    fillAlpha: number;
+    /** The fill colour's low 24 bits; read fill alpha separately with . @since 0.5.0 @mc * */
+    fillColor: number;
+    /** Whether the interior is drawn. @since 0.5.0 @mc * */
+    filled: boolean;
+    /** The first corner as a point copy; modifying it does not move the box. @since 0.5.0 @mc * */
+    pos1: Pos3D;
+    /** The opposite corner as a point copy. @since 0.5.0 @mc * */
+    pos2: Pos3D;
+    /** Returns this box without attaching it to an overlay. @since 0.5.0 @mc * */
+    build(): Box;
+    /** Attaches this box to the overlay its builder came from and returns it. @since 0.5.0 @mc * */
+    buildAndAdd(): Box;
+    /** Orders boxes lexicographically by their corner coordinates in supplied order; colours, fill and culling are ignored. @since 0.5.0 @mc * */
+    compareToSame(other: Box): number;
+    /** Enables depth testing (terrain can hide the box) or draws over the world; defaults to false. @since 0.5.0 @mc * */
+    cull(cull: boolean): Box;
+    /** Sets both corners to cover the block at these coordinates, from its corner one block further along each axis; replaces any previous corners. @since 0.5.0 @mc * */
+    forBlock(pos: BlockPos): Box;
+    /** Sets both corners at once, creating copies of the supplied points. @since 0.5.0 @mc * */
+    pos(pos1: Pos3D, pos2: Pos3D): Box;
+    /** Replaces the outline alpha without touching the RGB bits or the fill. @since 0.5.0 @mc * */
+    setAlpha(alpha: number): Box;
+    /** Sets the outline colour; a non-zero RGB value with a zero alpha byte becomes opaque, transparent black stays transparent. @since 0.5.0 @mc * */
+    setColor(color: number, alpha?: number): Box;
+    /** Controls whether the interior is drawn; the outline is unaffected. @since 0.5.0 @mc * */
+    setFill(fill: boolean): Box;
+    /** Replaces the fill alpha without touching the fill colour or outline. @since 0.5.0 @mc * */
+    setFillAlpha(alpha: number): Box;
+    /** Sets the fill colour with the same zero-alpha rule as ; stored even while fill is off. @since 0.5.0 @mc * */
+    setFillColor(fillColor: number, alpha?: number): Box;
+    /** Replaces both corners, retaining the supplied order. @since 0.5.0 @mc * */
+    setPos(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Box;
+    /** Sets the first corner; a second corner is still required to define the box. @since 0.5.0 @mc * */
+    setPos1(pos: Pos3D): Box;
+    /** Sets the opposite corner. @since 0.5.0 @mc * */
+    setPos2(pos: Pos3D): Box;
+    /** Covers the block at pos, extending one block along each axis from its integer coordinates. @since 0.5.0 @mc * */
+    setPosToBlock(pos: BlockPos): Box;
+    /** Sets a cube centred on pos with side length 2 * radius; a negative radius reverses the corner order. @since 0.5.0 @mc * */
+    setPosToPoint(pos: Pos3D, radius: number): Box;
 }
 
 /** A breeze: slide attack state. */
 interface BreezeEntity extends MobEntity {
     /** Whether the breeze is sliding toward its target. @since 0.2.0 @mc * */
     readonly sliding: boolean;
+}
+
+/** Session handle of one screen built through player.buildScreen: the write face over the control tree (add/remove/setControl), runtime callback swaps (gui.on), reload/close, and the live reads (title/name/closed/controls/shiftDown/...). One handle = one buildScreen call; any close path (Esc, gui.close(), replacement by another screen, owner unload) pushes it to closed and fires the close callback exactly once. Callback dispatch is synchronous on the caller thread with a watchdog budget; a callback that throws is swallowed and reads as "not consumed". Input callbacks registered through answer true when the script returns true (truthy = consumed); callbacks seeded in the spec object run through the engine's channel, which drops their return value, so consuming handlers belong on . After closed every mutator throws, controls reads back as empty, and plain reads (title/name/closed) keep answering. */
+interface BuiltScreen {
+    /** Whether Alt is currently held. @since 0.5.0 @mc * */
+    readonly altDown: boolean;
+    /** Whether the session reached its terminal state. @since 0.5.0 @mc * */
+    readonly closed: boolean;
+    /** Whether Ctrl is currently held. @since 0.5.0 @mc * */
+    readonly controlDown: boolean;
+    /** Live control snapshots in (z, declaration) order; empty when closed. @since 0.5.0 @mc * */
+    readonly controls: Array<ControlState>;
+    /** The host class name (ScriptScreen). @since 0.5.0 @mc * */
+    readonly name: string;
+    /** Where closing returns to: current or game. @since 0.5.0 @mc * */
+    readonly returnTo: string;
+    /** Whether Shift is currently held. @since 0.5.0 @mc * */
+    readonly shiftDown: boolean;
+    /** The screen title (plain text). @since 0.5.0 @mc * */
+    readonly title: string;
+    /** Appends one control (rebuilt immediately, same session). Accepts a plain spec object literal or a builder's build() product: the engine hands both over as maps (records snapshot to their full component set, absent optionals as null — reads those as unset), and the Consumer callback fields survive that snapshot, so builder callbacks reach the session. @since 0.5.0 @mc * */
+    add(control: ControlSpec): BuiltScreen;
+    /** The live button/image-button handle for one control (G-036). @since 0.5.0 @mc * */
+    button(id: string): Button;
+    /** The live checkbox handle for one control (G-036). @since 0.5.0 @mc * */
+    checkbox(id: string): Checkbox;
+    /** Closes the screen (close intent: close callback first, then return to the captured parent or the game per returnTo). Throws once the session is closed. The close callback fires on the calling thread before the port's main-thread hop: that hop must never need the context loop back (a loop blocked waiting on the main thread would deadlock the bridge). The port hop then only restores the parent screen, and its terminal notification is an idempotent no-op. @since 0.5.0 @mc * */
+    close(): void;
+    /** One control snapshot, or undefined for a closed session/unknown id. @since 0.5.0 @mc * */
+    control(id: string): ControlState;
+    /** The live cycling-button handle for one control (G-036B). @since 0.5.0 @mc * */
+    cycleButton(id: string): CycleButton;
+    /** The live edit-box handle for one control (G-036). @since 0.5.0 @mc * */
+    editBox(id: string): EditBox;
+    /** The live lock-button handle for one control (G-036B). @since 0.5.0 @mc * */
+    lockButton(id: string): LockButton;
+    /** Swaps one screen-level callback at runtime: mouseDown, mouseDrag, mouseUp, keyPress, charTyped, render, close; null clears. Input callbacks answer true = consumed. @since 0.5.0 @mc * */
+    on(name: string, callback: ((e: any) => boolean) | null): BuiltScreen;
+    /** Adopts live widget state and rebuilds the control tree without ending the session (callbacks and owner stay attached). @since 0.5.0 @mc * */
+    reload(): BuiltScreen;
+    /** Removes one control by id (rebuilt immediately). @since 0.5.0 @mc * */
+    remove(id: string): BuiltScreen;
+    /** Applies a whitelisted state patch (checked/value/text/locked/ label/active/visible/z) to one live control. @since 0.5.0 @mc * */
+    setControl(id: string, patch: Record<string, any>): BuiltScreen;
+    /** The live slider handle for one control (G-036). @since 0.5.0 @mc * */
+    slider(id: string): Slider;
+}
+
+/** Live handle for a button (and imageButton) control on an open , named with the Mojang word (G-003 §5.2 / WAVE-DECISIONS C⑤). The button-specific and shared widget members (click, message/label, active, …) belong to the ClickableWidgetHelper account and land with G-036B on the base; this class ships the typed binding now so can answer. */
+interface Button extends Widget {
+}
+
+/** Builder for button controls: the root-constructed fluent chain (G-003 §5.1 cross-task fold — the factory member is accounted to G-035 and lands here). height/size come from the skeleton; action maps to ; the builder-side getAction readback is compat-held (G-003 §13 回写⑤) with its capability on build().onClick(). */
+interface ButtonBuilder extends AbstractWidgetBuilder {
+    construct(args: Array<unknown>): unknown;
+    /** Registers the press callback (action → onClick). @since 0.5.0 @mc * */
+    onClick(handler: (e: {id: string, type: string}) => void): ButtonBuilder;
 }
 
 /** A camel: dash and sit pose, over the horse inventory base. */
@@ -2074,6 +3545,29 @@ interface CatEntity extends TamableAnimalEntity {
     readonly variant: string;
 }
 
+/** Builder for checkbox controls (the handle side takes the Mojang spelling): checked(b) seeds the initial state, action maps to ; the builder-side isChecked readback is compat-held with its capability on build().checked. */
+interface CheckBoxBuilder extends AbstractWidgetBuilder {
+    /** Seeds the initial checked state (isChecked reads it back). @since 0.5.0 @mc * */
+    checked(checked: boolean): CheckBoxBuilder;
+    construct(args: Array<unknown>): unknown;
+    /** Registers the value-change callback (action → onChange). @since 0.5.0 @mc * */
+    onChange(handler: (e: {id: string, type: string, checked?: boolean}) => void): CheckBoxBuilder;
+}
+
+/** Live handle for a checkbox control. State reads come from the session cache (kept fresh by stateChanged); writes go through the setControl whitelist and land on the live widget without an event echo (the CheckboxAccessor path). */
+interface Checkbox extends Widget {
+    /** Whether the box is currently checked (isChecked). @since 0.5.0 @mc * */
+    checked: boolean;
+    /** Sets the checked state and returns this handle. @since 0.5.0 @mc * */
+    setChecked(checked: boolean): Checkbox;
+    /** Flips the checked state and returns this handle. @since 0.5.0 @mc * */
+    toggle(): Checkbox;
+}
+
+/** A chest boat (discriminated also by the chest_boat type id). */
+interface ChestBoatEntity extends BoatEntity {
+}
+
 /** A chicken. */
 interface ChickenEntity extends AnimalEntity {
 }
@@ -2086,22 +3580,36 @@ interface Chunk {
     readonly chunkX: number;
     /** The chunk z coordinate. @since 0.2.0 @mc * */
     readonly chunkZ: number;
+    /** The entities inside the chunk's bounds, empty list when unloaded. @since 0.5.0 @mc * */
+    readonly entities: Array<Entity>;
+    /** The chunk's build height in blocks, or null when unloaded. @since 0.5.0 @mc * */
+    readonly height: number;
     /** The primed heightmaps as {type: number[256]} indexed by localX + localZ * 16, or null when unloaded. @since 0.2.0 @mc * */
     readonly heightmaps: Record<string, Array<number>>;
     /** The inhabited ticks reported by the chunk, or null when unloaded. @since 0.2.0 @mc * */
     readonly inhabitedTime: number;
     /** The highest buildable y of the chunk, or null when unloaded. @since 0.2.0 @mc * */
     readonly maxY: number;
+    /** The world position of the chunk's local origin (northwest corner at y = 0), available without a loaded world. @since 0.5.0 @mc * */
+    readonly minBlock: BlockPos;
     /** The lowest buildable y of the chunk, or null when unloaded. @since 0.2.0 @mc * */
     readonly minY: number;
     /** The biome identifier at the position inside this chunk, or null when unloaded. @since 0.2.0 @mc * */
     biomeAt(x: number, y: number, z: number): string;
     /** Whether the world position lies inside this chunk. @since 0.2.0 @mc * */
     contains(x: number, y: number, z: number): boolean;
+    /** Whether the chunk contains every one of the given block ids; an unloaded chunk answers undefined, an empty request answers true, and an unresolvable id fails the check. @since 0.5.0 @mc * */
+    containsAll(blocks: string | Array<string>): boolean;
+    /** Whether the chunk contains any of the given block ids; an unloaded chunk answers undefined, an empty request answers false. @since 0.5.0 @mc * */
+    containsAny(blocks: string | Array<string>): boolean;
     /** The surface height (world surface) at the world coordinates inside this chunk, or null when unloaded. @since 0.2.0 @mc * */
     heightAt(x: number, z: number): number;
+    /** The world block position from a local x/z offset and an absolute y; offsets outside 0..15 address neighbouring chunks. @since 0.5.0 @mc * */
+    offsetBlock(xOffset: number, y: number, zOffset: number): BlockPos;
     /** Plain-object rendering used by JSON.stringify. @since 0.3.0 @mc * */
     toJSON(): string;
+    /** The first available y of one heightmap column (local x/z offsets), or null when unloaded, the local offsets fall outside 0..15, or the heightmap type is unknown. @since 0.5.0 @mc * */
+    topYAt(xOffset: number, zOffset: number, heightmap: string): number;
 }
 
 /** Immutable chunk-grid coordinate. Deliberately unrelated to : chunk coordinates and block coordinates are different spaces and every conversion between them is explicit (x = blockX >> 4). */
@@ -2128,12 +3636,16 @@ interface ChunkPos {
 interface CodEntity extends AbstractSchoolingFishEntity {
 }
 
-/** One typed argument slot of a registered command. Slots build through the dynamic command.arg factory (int() float() bool() word() string() greedy() player() pos()) and chain optional() and default(v). Parsing walks slots in declaration order against the raw remainder; greedy consumes everything that is left. */
+/** One typed argument slot of a registered command. Slots build through the dynamic command.arg factory (int() long() float() bool() word() string() greedy() player() pos() uuid() identifier() time() literal()) and chain optional(), default(v) and the numeric range(min, max). Parsing walks slots in declaration order against the raw remainder; quoted string slots accept spaces, greedy consumes everything that is left, and literal requires its fixed word. This is the single argument vocabulary of the declarative command.register surface; no parallel builder grows here. */
 interface CommandArg {
     /** Supplies the fallback value for an optional slot. @since 0.1.0 @mc * */
     defaultTo(value: number | string | boolean): CommandArg;
     /** Marks the slot optional (missing input falls back, never raises). @since 0.1.0 @mc * */
     optional(): CommandArg;
+    /** Bounds a numeric slot (int, long, float) to the inclusive [min, max] interval; out-of-range input is rejected while parsing. @since 0.5.0 @mc * */
+    range(min: number, max: number): CommandArg;
+    /** Attaches completion metadata to the slot: either a fixed candidate list, or a callback receiving the while the player tabs through this slot. @since 0.5.0 @mc * */
+    suggests(value: string[] | ((builder: SuggestionsBuilder) => void)): CommandArg;
 }
 
 /** The live value handed to a command handler: typed parsed arguments plus the raw remainder string. Rendered to scripts as a flat handle with the args property and the raw property. */
@@ -2144,7 +3656,7 @@ interface CommandContext {
     readonly raw: string;
 }
 
-/** Builder for immutable values; the single construction path for script-made styled text. Style setters mutate the draft in place and return the same builder; build() is non-destructive, so the draft stays reusable for further chaining. Click actions and hover content are mutually exclusive — the latest call wins. */
+/** Builder for immutable values; the single construction path for script-made styled text. Style setters mutate the draft in place and return the same builder; build() is non-destructive, so the draft stays reusable for further chaining. Hover content is single-valued: the text, item, and entity hovers replace one another, latest call wins. */
 interface Component {
     /** Appends one child: another draft (built immediately), a built value, or a plain string. Children inherit this node's styling unless they set their own. @since 0.4.0 @mc * */
     append(child: Component | TextComponent | string): Component;
@@ -2152,6 +3664,8 @@ interface Component {
     bold(value?: boolean): Component;
     /** Produces the immutable value; the draft stays usable. @since 0.4.0 @mc * */
     build(): TextComponent;
+    /** Sets any built-in click action by name; the action is matched case-insensitively and the value is checked against the action. Supported: open_url, run_command, suggest_command, copy_to_clipboard, change_page (decimal page number), open_file. @since 0.5.0 @mc * */
+    click(action: string, value: string): Component;
     /** Click runs the command as the local player. @since 0.4.0 @mc * */
     clickCommand(command: string): Component;
     /** Click copies the text to the clipboard. @since 0.4.0 @mc * */
@@ -2164,9 +3678,11 @@ interface Component {
     color(value: string): Component;
     /** Copies content, own styling, and children from an existing value as the base draft, then lets chained calls override. @since 0.4.0 @mc * */
     copyFrom(other: TextComponent): Component;
-    /** Sets a show-text hover; replaces any item hover. @since 0.4.0 @mc * */
+    /** Sets a show-text hover; replaces any item or entity hover. @since 0.4.0 @mc * */
     hover(text: string): Component;
-    /** Sets a show-item hover; replaces any text hover. A string is the item id (count 1); an ItemStack rides its full snapshot. @since 0.4.0 @mc * */
+    /** Sets a show-entity hover; replaces any text or item hover. The entity type and display name are captured now, so a later unload keeps the tooltip the hover was built with. @since 0.5.0 @mc * */
+    hoverEntity(entity: Entity): Component;
+    /** Sets a show-item hover; replaces any text or entity hover. A string is the item id (count 1); an ItemStack rides its full snapshot. @since 0.4.0 @mc * */
     hoverItem(item: ItemStack | string): Component;
     /** Sets italic on or off. @since 0.4.0 @mc * */
     italic(value?: boolean): Component;
@@ -2174,8 +3690,114 @@ interface Component {
     obfuscated(value?: boolean): Component;
     /** Sets strikethrough on or off. @since 0.4.0 @mc * */
     strikethrough(value?: boolean): Component;
+    /** Replaces this section's whole style — color, decorations, hover, and click — with the style of an existing value; content and children are untouched. @since 0.5.0 @mc * */
+    style(source: TextComponent): Component;
     /** Sets underline on or off. @since 0.4.0 @mc * */
     underlined(value?: boolean): Component;
+}
+
+/** One declarative control in a : frozen data, never a live widget. A single discriminated record (the DialogConfig convention) carries all seven control types — button/imageButton/checkbox/ slider/editBox/cycleButton/lockButton — with type-specific optional fields; the adapter builds the vanilla widget from the neutral form. Callbacks (onClick/onChange) never cross the port: the facade unwraps them from the script object and holds them in the session. Scripts pass a plain object literal; the engine hands the facade the record's function fields as instances (the CommandSpec.handler mechanism). */
+interface ControlSpec {
+    /** active @since 0.5.0 @mc * */
+    readonly active: boolean;
+    /** alpha @since 0.5.0 @mc * */
+    readonly alpha: number;
+    /** alternateToggle @since 0.5.0 @mc * */
+    readonly alternateToggle: () => boolean;
+    /** alternatives @since 0.5.0 @mc * */
+    readonly alternatives: string[];
+    /** checked @since 0.5.0 @mc * */
+    readonly checked: boolean;
+    /** editable @since 0.5.0 @mc * */
+    readonly editable: boolean;
+    /** height @since 0.5.0 @mc * */
+    readonly height: number;
+    /** id @since 0.5.0 @mc * */
+    readonly id: string;
+    /** initial @since 0.5.0 @mc * */
+    readonly initial: string;
+    /** label @since 0.5.0 @mc * */
+    readonly label: string;
+    /** locked @since 0.5.0 @mc * */
+    readonly locked: boolean;
+    /** maxLength @since 0.5.0 @mc * */
+    readonly maxLength: number;
+    /** omitTextOption @since 0.5.0 @mc * */
+    readonly omitTextOption: boolean;
+    /** onChange @since 0.5.0 @mc * */
+    readonly onChange: (e: {id: string, type: string, checked?: boolean, value?: number, text?: string, locked?: boolean}) => void;
+    /** onClick @since 0.5.0 @mc * */
+    readonly onClick: (e: {id: string, type: string}) => void;
+    /** prefix @since 0.5.0 @mc * */
+    readonly prefix: string;
+    /** showMessage @since 0.5.0 @mc * */
+    readonly showMessage: boolean;
+    /** sprites @since 0.5.0 @mc * */
+    readonly sprites: Record<string, string>;
+    /** steps @since 0.5.0 @mc * */
+    readonly steps: number;
+    /** suggestion @since 0.5.0 @mc * */
+    readonly suggestion: string;
+    /** text @since 0.5.0 @mc * */
+    readonly text: string;
+    /** type @since 0.5.0 @mc * */
+    readonly type: string;
+    /** value @since 0.5.0 @mc * */
+    readonly value: number;
+    /** valueLabels @since 0.5.0 @mc * */
+    readonly valueLabels: Record<string, string>;
+    /** values @since 0.5.0 @mc * */
+    readonly values: string[];
+    /** visible @since 0.5.0 @mc * */
+    readonly visible: boolean;
+    /** width @since 0.5.0 @mc * */
+    readonly width: number;
+    /** x @since 0.5.0 @mc * */
+    readonly x: number;
+    /** y @since 0.5.0 @mc * */
+    readonly y: number;
+    /** z @since 0.5.0 @mc * */
+    readonly z: number;
+}
+
+/** Read-only snapshot of one control on a : layout plus the live value fields that exist for its type (absent = undefined for the guest). Snapshots come from the session cache (seeded from the spec, refreshed by stateChanged writes) or a port read-back on a miss. G-036 adds four type-specific fields: steps (slider), editable/maxLength (edit box) and selectedText (the edit box's live selection, read-only). */
+interface ControlState {
+    /** active @since 0.5.0 @mc * */
+    readonly active: boolean;
+    /** checked @since 0.5.0 @mc * */
+    readonly checked: boolean;
+    /** editable @since 0.5.0 @mc * */
+    readonly editable: boolean;
+    /** height @since 0.5.0 @mc * */
+    readonly height: number;
+    /** id @since 0.5.0 @mc * */
+    readonly id: string;
+    /** label @since 0.5.0 @mc * */
+    readonly label: string;
+    /** locked @since 0.5.0 @mc * */
+    readonly locked: boolean;
+    /** maxLength @since 0.5.0 @mc * */
+    readonly maxLength: number;
+    /** selectedText @since 0.5.0 @mc * */
+    readonly selectedText: string;
+    /** steps @since 0.5.0 @mc * */
+    readonly steps: number;
+    /** text @since 0.5.0 @mc * */
+    readonly text: string;
+    /** type @since 0.5.0 @mc * */
+    readonly type: string;
+    /** value @since 0.5.0 @mc * */
+    readonly value: number;
+    /** visible @since 0.5.0 @mc * */
+    readonly visible: boolean;
+    /** width @since 0.5.0 @mc * */
+    readonly width: number;
+    /** x @since 0.5.0 @mc * */
+    readonly x: number;
+    /** y @since 0.5.0 @mc * */
+    readonly y: number;
+    /** z @since 0.5.0 @mc * */
+    readonly z: number;
 }
 
 /** A cow: coat variant. */
@@ -2202,20 +3824,481 @@ interface CreeperEntity extends MobEntity {
     readonly ignited: boolean;
     /** Whether the creeper is charged by a lightning strike. @since 0.2.0 @mc * */
     readonly powered: boolean;
+    /** The current swell progress from 0 to 1 (client-side animation). @since 0.5.0 @mc * */
+    readonly swell: number;
+    /** The swell direction: 1 while building up, -1 while easing off, 0 when idle. @since 0.5.0 @mc * */
+    readonly swellDir: number;
+}
+
+/** A script-owned pixel canvas: an in-memory ARGB image the script draws on and hands to the game as a texture. Drawing calls change only the in-memory pixels; uploads those pixels to the texture registered under . Updates upload the whole image, so batch several drawing calls and upload once afterwards. Images register under neomacros:image/<name>; creating another image with the same name reuses that identifier. The script gets one through new CustomImage(width, height, name) for a blank canvas or new CustomImage(path, name) for one loaded from a file below the NeoMacros config directory. */
+interface CustomImage {
+    /** The bounds of the current clip as {x, y, width, height}, or undefined when no clip is set. @since 0.5.0 @mc * */
+    readonly clipBounds: ClipBounds;
+    /** The current graphics drawing color as an opaque ARGB integer, signed across the script boundary like . @since 0.5.0 @mc * */
+    readonly graphicsColor: number;
+    /** The image height in pixels; fixed at construction. @since 0.5.0 @mc * */
+    readonly height: number;
+    /** The registered texture identifier of this image; images with the same name share the identifier. @since 0.5.0 @mc * */
+    readonly identifier: string;
+    /** A PNG-encoded snapshot of the current pixels; changes made through this image's drawing members are included, changes made to the snapshot are not (use to composite it back). @since 0.5.0 @mc * */
+    readonly image: Image;
+    /** The registration name supplied at construction, without the neomacros:image/ prefix. @since 0.5.0 @mc * */
+    readonly name: string;
+    /** The image width in pixels; fixed at construction. @since 0.5.0 @mc * */
+    readonly width: number;
+    /** Clears the rectangle using the graphics background color, which is separate from the drawing color; pass color to choose the background for this operation only. @since 0.5.0 @mc * */
+    clearRect(x: number, y: number, width: number, height: number, color?: number): CustomImage;
+    /** Intersects the current clip with the given rectangle, restricting subsequent drawing to the intersection; the clip follows the graphics transform, including translations. @since 0.5.0 @mc * */
+    clipRect(x: number, y: number, width: number, height: number): CustomImage;
+    /** Copies a region of this image to another location in the same image; dx and dy are offsets from the source region's origin and overlapping regions are supported. @since 0.5.0 @mc * */
+    copyArea(x: number, y: number, width: number, height: number, dx: number, dy: number): CustomImage;
+    /** Draws a 3D-effect rectangle outline: the drawing color supplies the line and the graphics background supplies the shading; raised selects raised or etched shading. @since 0.5.0 @mc * */
+    draw3DRect(x: number, y: number, width: number, height: number, raised: boolean): CustomImage;
+    /** Draws an unfilled arc of the oval bounded by the given rectangle; angles are degrees, 0 is at three o'clock and positive angles proceed anticlockwise. @since 0.5.0 @mc * */
+    drawArc(x: number, y: number, width: number, height: number, startAngle: number, arcAngle: number): CustomImage;
+    /** Draws the source image into this image at (x, y), scaled to width x height. With the optional source rectangle only that region of the source is drawn; omitted source values default to the whole source image. Changes stay in memory until uploads them. @since 0.5.0 @mc * */
+    drawImage(img: Image, x: number, y: number, width: number, height: number, sourceX?: number, sourceY?: number, sourceWidth?: number, sourceHeight?: number): CustomImage;
+    /** Draws the outline of an oval bounded by the given rectangle in the current graphics color. @since 0.5.0 @mc * */
+    drawOval(x: number, y: number, width: number, height: number): CustomImage;
+    /** Draws a closed polygon outline through the corresponding entries of the two coordinate arrays; entries beyond the shorter array are ignored. @since 0.5.0 @mc * */
+    drawPolygon(pointsX: Array<number>, pointsY: Array<number>): CustomImage;
+    /** Draws an open polyline through the corresponding entries of the two coordinate arrays; entries beyond the shorter array are ignored and the last point joins the first only when the supplied points do so. @since 0.5.0 @mc * */
+    drawPolygonLine(pointsX: Array<number>, pointsY: Array<number>): CustomImage;
+    /** Draws a rectangle outline in the current graphics color. @since 0.5.0 @mc * */
+    drawRect(x: number, y: number, width: number, height: number): CustomImage;
+    /** Draws a rounded-rectangle outline; arcWidth and arcHeight are the corner arc diameters. @since 0.5.0 @mc * */
+    drawRoundRect(x: number, y: number, width: number, height: number, arcWidth: number, arcHeight: number): CustomImage;
+    /** Draws text in the current graphics color; y is the text baseline, not its top. @since 0.5.0 @mc * */
+    drawString(x: number, y: number, text: string): CustomImage;
+    /** Fills a 3D-effect rectangle in the current graphics color; the graphics background supplies the shading and raised selects raised or etched shading. @since 0.5.0 @mc * */
+    fill3DRect(x: number, y: number, width: number, height: number, raised: boolean): CustomImage;
+    /** Fills the arc segment of the oval bounded by the given rectangle; angles follow . @since 0.5.0 @mc * */
+    fillArc(x: number, y: number, width: number, height: number, startAngle: number, arcAngle: number): CustomImage;
+    /** Fills an oval bounded by the given rectangle in the current graphics color. @since 0.5.0 @mc * */
+    fillOval(x: number, y: number, width: number, height: number): CustomImage;
+    /** Fills the polygon defined by the corresponding entries of the two coordinate arrays; entries beyond the shorter array are ignored. @since 0.5.0 @mc * */
+    fillPolygon(pointsX: Array<number>, pointsY: Array<number>): CustomImage;
+    /** Fills a rectangle in the current graphics color. @since 0.5.0 @mc * */
+    fillRect(x: number, y: number, width: number, height: number): CustomImage;
+    /** Fills a rounded rectangle in the current graphics color. @since 0.5.0 @mc * */
+    fillRoundRect(x: number, y: number, width: number, height: number, arcWidth: number, arcHeight: number): CustomImage;
+    /** The pixel at (x, y) as an ARGB integer; coordinates outside the image throw. Opaque pixels cross the script boundary as signed 32-bit values (pixel | 0 normalizes a full-range literal before comparing). @since 0.5.0 @mc * */
+    getPixel(x: number, y: number): number;
+    /** The pixel width of a string in the current graphics font; the string need not have been drawn first. @since 0.5.0 @mc * */
+    getStringWidth(toAnalyze: string): number;
+    /** Loads an image from a path below the NeoMacros config directory; returns undefined if the file cannot be read or no image reader recognizes it. Pass x, y, width and height to receive only that crop; a crop running outside the image throws. @since 0.5.0 @mc * */
+    loadImage(path: string, x?: number, y?: number, width?: number, height?: number): Image;
+    /** Swaps the red and blue bytes of an ARGB value (alpha and green stay); a pixel-format helper that never modifies an image. The value is read as a 32-bit pattern, so full-range and signed forms both work. @since 0.5.0 @mc * */
+    nativeARGBFlip(argb: number): number;
+    /** Saves the current pixels as a PNG below the NeoMacros config directory; .png is appended to fileName and an existing file is overwritten. This saves the in-memory image whether or not has uploaded recent changes. @since 0.5.0 @mc * */
+    saveImage(path: string, fileName: string): CustomImage;
+    /** Replaces the current clip with the given rectangle rather than intersecting it as does. @since 0.5.0 @mc * */
+    setClip(x: number, y: number, width: number, height: number): CustomImage;
+    /** Sets the opaque drawing color used by drawing operations; the alpha bits of color are ignored. This does not set the background used by . Full-range literals such as 0xFFFF00FF are accepted as 32-bit patterns. @since 0.5.0 @mc * */
+    setGraphicsColor(color: number): CustomImage;
+    /** Restores ordinary paint mode after . @since 0.5.0 @mc * */
+    setPaintMode(): CustomImage;
+    /** Sets one pixel from an ARGB integer; call to upload the change to its texture. This does not change the graphics drawing color. Coordinates outside the image throw. The value is a 32-bit pattern: full-range literals like 0xFF112233 and signed forms like 0xFF112233 | 0 both land on the same pixels. @since 0.5.0 @mc * */
+    setPixel(x: number, y: number, argb: number): CustomImage;
+    /** Sets XOR paint mode with color as the XOR color; the mode remains active until is called. @since 0.5.0 @mc * */
+    setXorMode(color: number): CustomImage;
+    /** Translates the graphics origin for subsequent drawing operations; the translation is cumulative and does not move existing pixels. @since 0.5.0 @mc * */
+    translate(x: number, y: number): CustomImage;
+    /** Uploads the current pixels to this image's texture so changes become visible; the full image is copied and uploaded on the game main thread. Batch drawing changes and call this once afterward. @since 0.5.0 @mc * */
+    update(): Promise<CustomImage>;
+}
+
+/** Live handle for a cycleButton control (Mojang word per G-003 §5.3). The generic T collapses to plain strings: control option values are strings (ControlSpec.values), so the handle reads and writes the string value. setValue writes the value straight onto the button — the configured change callback does not run (vanilla CycleButton.setValue semantics); cycle(n) steps n positions through the current option list (wrapping) and does fire the change callback once, exactly like a press. The live value rides the control's text slot. */
+interface CycleButton extends Widget {
+    /** The current value rendered as plain display text by the builder's valueToText converter, without the option prefix (getStringValue); without a converter this is the raw value. @since 0.5.0 @mc * */
+    stringValue: string;
+    /** The selected option value (getValue). @since 0.5.0 @mc * */
+    value: string;
+    /** Cycles amount positions through the current option list, wrapping at either end; positive moves forward, negative backward (cycle). The configured change callback runs once for the cycle — including a cycle that lands on the same value. @since 0.5.0 @mc * */
+    cycle(amount: number): CycleButton;
+    /** Sets the displayed value directly, without cycling and without running the change callback (setValue). Answers true when the previous value already equalled value (equality uses equals); the value is set regardless. @since 0.5.0 @mc * */
+    setValue(value: string): boolean;
+}
+
+/** Builder for cycleButton controls: the root-constructed fluent chain (G-035 row34 fold — the factory's converter argument moves to , since the engine's constructor bridge only carries scalars). values/alternatives seed the two option lists, initially the starting value, action maps to , and alternateToggle registers the per-cycle list selector that reaches the adapter through SessionSink.alternateToggle. Builder-side readbacks (getAction/getInitialValue/…) are compat-held with their capability on the build() product (G-003 §5.2). The valueToText converter is consumed at : every option is rendered once into the neutral valueLabels map, so the adapter and CycleButton.getStringValue read plain strings and no function ever crosses the port. The generic T collapses to strings (control option values are strings). */
+interface CyclicButtonBuilder extends AbstractWidgetBuilder {
+    /** Sets the function that picks the option list for each cycle: true selects the alternate list, false the default (alternateToggle). Without a toggle the adapter keeps the vanilla selector (Alt held). The function must be set here — a function inside an object literal cannot return its verdict. @since 0.5.0 @mc * */
+    alternateToggle(toggle: () => boolean): CyclicButtonBuilder;
+    /** Replaces the alternate option list (alternatives). @since 0.5.0 @mc * */
+    alternatives(values: string[]): CyclicButtonBuilder;
+    construct(args: Array<unknown>): unknown;
+    /** Seeds the starting option value (initially). @since 0.5.0 @mc * */
+    initially(value: string): CyclicButtonBuilder;
+    /** Sets whether the widget shows only the option value instead of the option prefix and value (omitTextOption); a blank prefix is omitted regardless. @since 0.5.0 @mc * */
+    omitTextOption(omitted: boolean): CyclicButtonBuilder;
+    /** Registers the value-change callback (action → onChange); it fires on every cycle and on user presses, not on setValue. @since 0.5.0 @mc * */
+    onChange(handler: (e: {id: string, type: string, value?: string}) => void): CyclicButtonBuilder;
+    /** Sets the prefix displayed before the value (option); a blank prefix is omitted from the rendered text. @since 0.5.0 @mc * */
+    option(option: string): CyclicButtonBuilder;
+    /** Sets the converter that renders one option value into its display text (valueToText). It runs at for every option; return null to keep the raw value. @since 0.5.0 @mc * */
+    valueToText(converter: (value: string) => string): CyclicButtonBuilder;
+    /** Replaces the default option list; the alternate list is kept. Pass a second list to replace both (values). @since 0.5.0 @mc * */
+    values(defaults: string[], alternatives?: string[]): CyclicButtonBuilder;
+}
+
+/** Display entity base: billboard, brightness, scaling, and shadow settings shared by block/item/text displays. */
+interface DisplayEntity extends Entity {
+    /** The billboard mode (fixed, vertical, horizontal, or center). @since 0.5.0 @mc * */
+    readonly billboard: string;
+    /** The packed light override, or undefined when following the world. @since 0.5.0 @mc * */
+    readonly brightness: number;
+    /** The display height scale multiplier. @since 0.5.0 @mc * */
+    readonly displayHeight: number;
+    /** The display width scale multiplier. @since 0.5.0 @mc * */
+    readonly displayWidth: number;
+    /** The glow color override as packed RGB, or undefined. @since 0.5.0 @mc * */
+    readonly glowColorOverride: number;
+    /** The shadow radius in blocks. @since 0.5.0 @mc * */
+    readonly shadowRadius: number;
+    /** The shadow strength from 0 to 1. @since 0.5.0 @mc * */
+    readonly shadowStrength: number;
+    /** The view range multiplier. @since 0.5.0 @mc * */
+    readonly viewRange: number;
+    /** The culling (visibility) box at the current position, sized by the display width and height; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly visibilityBoundingBox: BoundingBox;
 }
 
 /** A dolphin: moisture level. */
 interface DolphinEntity extends MobEntity {
     /** The moisture level (max 2400; dries out on land). @since 0.2.0 @mc * */
     readonly moistness: number;
+    /** Whether the dolphin currently has a fish in its mouth. @since 0.5.0 @mc * */
+    hasFish(): boolean;
 }
 
 /** A donkey. */
 interface DonkeyEntity extends AbstractChestedHorseEntity {
 }
 
+/** Handle to one element living inside a HUD layer, obtained from layer.text(...) / layer.rect(...) upserts and from layer.element(id) / layer.elements. This class is the base face of the component family: Draw2DText / Draw2DRect (G-034), Draw2DImage / Draw2DItem (G-034B) and the alignment surface (G-034C) extend it without changing the geometry, transform, z-order and lifecycle contract declared here. Element is its own builder (拍板②): every setter is fluent and returns this, so configuration and mutation are one object at one moment, with no parallel XxxBuilder class tree. State model: the element owns no mutable fields of its own. Setters republish an immutable through the bridge (volatile write, next frame consumes it — G-001 §2.2); getters read the current snapshot. Geometry accepts absolute scaled pixels or viewport percentage strings ("50%"), resolving against the layer viewport at paint time. Disposal: the handle turns disposed when its element is removed, replaced by a different component kind, cleared from the layer, or the layer itself is removed. Afterwards every read property answers undefined (Java null) and every setter throws IllegalStateException: element no longer valid; only stays readable. */
+interface Draw2DElement {
+    /** The resolved absolute box: percentage geometry evaluated against the current viewport, width and height multiplied by and truncated toward zero; undefined once disposed. @since 0.5.0 @mc * */
+    readonly bounds: Bounds;
+    /** Whether this handle has been invalidated (element removed, replaced, cleared, or the layer disposed). Always readable. @since 0.5.0 @mc * */
+    readonly disposed: boolean;
+    /** The raw box height before scaling: absolute scaled pixels or the percentage string it was configured with; undefined once disposed. Use for the resolved number. @since 0.5.0 @mc * */
+    readonly height: number | string;
+    /** The element id inside its layer; undefined once disposed. @since 0.5.0 @mc * */
+    readonly id: string;
+    /** The layer hosting this element — the layer back-reference; undefined once disposed. @since 0.5.0 @mc * */
+    readonly layer: HudLayer;
+    /** The parent box used for parent-size queries. The v1 container is one level deep, so this is always the hosting layer (nested parents arrive with the P3 group element); undefined once disposed. @since 0.5.0 @mc * */
+    readonly parent: HudLayer;
+    /** The parent box height in scaled pixels — the hosting layer's viewport in v1; undefined once disposed. @since 0.5.0 @mc * */
+    readonly parentHeight: number;
+    /** The parent box width in scaled pixels — the hosting layer's viewport in v1; undefined once disposed. @since 0.5.0 @mc * */
+    readonly parentWidth: number;
+    /** Whether rotation pivots about the element center rather than its positioned corner; defaults to false. undefined once disposed. @since 0.5.0 @mc * */
+    readonly rotateCenter: boolean;
+    /** The rotation in degrees, normalized to [-180, 180) by constructors and setters; defaults to 0. undefined once disposed. @since 0.5.0 @mc * */
+    readonly rotation: number;
+    /** The render scale applied to this element; defaults to 1. undefined once disposed. @since 0.5.0 @mc * */
+    readonly scale: number;
+    /** The resolved bottom edge — the top edge plus the scaled height; undefined once disposed. @since 0.5.0 @mc * */
+    scaledBottom: number;
+    /** The resolved height multiplied by , truncated toward zero; undefined once disposed. @since 0.5.0 @mc * */
+    readonly scaledHeight: number;
+    /** The resolved left edge — scaling does not move it; undefined once disposed. @since 0.5.0 @mc * */
+    readonly scaledLeft: number;
+    /** The resolved right edge — the left edge plus the scaled width; undefined once disposed. @since 0.5.0 @mc * */
+    scaledRight: number;
+    /** The resolved top edge — scaling does not move it; undefined once disposed. @since 0.5.0 @mc * */
+    readonly scaledTop: number;
+    /** The resolved width multiplied by , truncated toward zero (the extent alignment math uses); undefined once disposed. @since 0.5.0 @mc * */
+    readonly scaledWidth: number;
+    /** Whether this element paints. An invisible element keeps its state and slot; it simply paints nothing. Defaults to true. undefined once disposed. @since 0.5.0 @mc * */
+    readonly visible: boolean;
+    /** The raw box width before scaling: absolute scaled pixels or the percentage string it was configured with (0 for text until sized); undefined once disposed. Use for the resolved, scale-applied number. @since 0.5.0 @mc * */
+    readonly width: number | string;
+    /** The raw x position: absolute scaled pixels, or the percentage string it was configured with; undefined once disposed. @since 0.5.0 @mc * */
+    readonly x: number | string;
+    /** The raw y position: absolute scaled pixels, or the percentage string it was configured with; undefined once disposed. @since 0.5.0 @mc * */
+    readonly y: number | string;
+    /** This element's ordering value on its layer: lower values draw first, ties keep insertion order; defaults to 0. undefined once disposed. @since 0.5.0 @mc * */
+    readonly zIndex: number;
+    /** Aligns this element on both axes within its parent box, or against a sibling element when the first argument is an element. Four call shapes are accepted: align(horizontal, vertical), align(horizontal, horizontalOffset, vertical, verticalOffset), align(other, horizontal, vertical) and align(other, horizontal, horizontalOffset, vertical, verticalOffset). An axis whose parent-relative token is unsupported stays put; sibling-relative tokens always resolve or throw. undefined once disposed. @since 0.5.0 @mc * */
+    align(horizontalOrOther: string | Draw2DElement, alignmentOrOffset: string | number, verticalOrHorizontalOffset?: string | number, verticalOrVerticalOffset?: string | number, verticalOffset?: number): Draw2DElement;
+    /** Aligns this element horizontally within its parent box, or against a sibling element when the first argument is an element. Parent-relative tokens are left, center, right or a whole-number percentage of the space the element's scaled width leaves unused; the offset is added to the resulting x. Sibling-relative tokens take the form <thisAnchor>On<otherAnchor> (a bare token aligns the same anchor on both elements); malformed sibling alignments throw, unsupported parent tokens do nothing. The y coordinate keeps its raw form; undefined once disposed. @since 0.5.0 @mc * */
+    alignHorizontally(alignmentOrParentOffset: string | Draw2DElement, alignmentOrOffset?: string | number, offset?: number): Draw2DElement;
+    /** Aligns this element vertically within its parent box, or against a sibling element when the first argument is an element. Parent-relative tokens are top, center, bottom or a whole-number percentage of the space the element's scaled height leaves unused; the offset is added to the resulting y. Sibling-relative tokens take the form <thisAnchor>On<otherAnchor> (a bare token aligns the same anchor on both elements); malformed sibling alignments throw, unsupported parent tokens do nothing. The x coordinate keeps its raw form; undefined once disposed. @since 0.5.0 @mc * */
+    alignVertically(alignmentOrParentOffset: string | Draw2DElement, alignmentOrOffset?: string | number, offset?: number): Draw2DElement;
+    /** Sets both position coordinates without changing size — an alias of . @since 0.5.0 @mc * */
+    moveTo(x: number | string, y: number | string): Draw2DElement;
+    /** Moves this element to x, retaining its current y coordinate — the raw form, so a percentage y keeps reflowing with the viewport; undefined once disposed. Zero and negative positions are allowed. @since 0.5.0 @mc * */
+    moveToX(x: number | string): Draw2DElement;
+    /** Moves this element to y, retaining its current x coordinate — the raw form, so a percentage x keeps reflowing with the viewport; undefined once disposed. Zero and negative positions are allowed. @since 0.5.0 @mc * */
+    moveToY(y: number | string): Draw2DElement;
+    /** Sets a fixed height, replacing any percentage or tracking supplier. Zero is allowed; negative pixel values throw. @since 0.5.0 @mc * */
+    setHeight(height: number | string): Draw2DElement;
+    /** Sets both position coordinates without changing dimensions. @since 0.5.0 @mc * */
+    setPos(x: number | string, y: number | string): Draw2DElement;
+    /** Sets whether rotation pivots about the element center rather than its positioned corner. @since 0.5.0 @mc * */
+    setRotateCenter(rotateCenter: boolean): Draw2DElement;
+    /** Sets the rotation in degrees; the value is narrowed to float and normalized to [-180, 180), so 270 reads back as -90. @since 0.5.0 @mc * */
+    setRotation(rotation: number): Draw2DElement;
+    /** Sets the render scale applied to this element. Zero and negative values throw. The value is stored immediately; the render transform that applies it ships with the component tasks (G-034). @since 0.5.0 @mc * */
+    setScale(scale: number): Draw2DElement;
+    /** Sets fixed width and height. Zero is allowed; negative dimensions throw. Width is applied first, so an invalid height leaves the width changed. @since 0.5.0 @mc * */
+    setSize(width: number | string, height: number | string): Draw2DElement;
+    /** Shows or hides this element. Pure core state: an invisible element keeps its slot and repaints nothing; the port is not touched. @since 0.5.0 @mc * */
+    setVisible(visible: boolean): Draw2DElement;
+    /** Sets a fixed width, replacing any percentage or tracking supplier. Zero is allowed; negative pixel values throw. @since 0.5.0 @mc * */
+    setWidth(width: number | string): Draw2DElement;
+    /** Sets the x position without changing y or dimensions. @since 0.5.0 @mc * */
+    setX(x: number | string): Draw2DElement;
+    /** Sets the y position without changing x or dimensions. @since 0.5.0 @mc * */
+    setY(y: number | string): Draw2DElement;
+    /** Sets this element's ordering value on its layer; lower values draw first, ties keep insertion order, negatives are allowed. The change re-sorts the layer draw order on the next frame without touching the port. @since 0.5.0 @mc * */
+    setZIndex(zIndex: number): Draw2DElement;
+}
+
+/** Handle to one texture-image element living inside a HUD layer, obtained from layer.image(id, …) upserts. The G-034B component face of : the texture view (setImage/image plus the imageX/imageY/region…/texture… source-rect properties) and the tint color — destination geometry, transform, z-order, alignment and lifecycle are inherited without re-declaration (G-034C contract). Texture consumption (G-030): the identifier is the same namespace:path key the texture registry uses, so a CustomImage feeds this face through img.identifier (live, re-uploadable) or through layer.image(id, {image}) (immutable PNG snapshot, uploaded once). A bare name takes the minecraft namespace; answers the resolved form. Region dimensions are stored and select the sampled texels; the 2D fallback samples the destination extent when the region is unset. Element is its own builder (拍板②): every setter is fluent and returns this handle. */
+interface Draw2DImage extends Draw2DElement {
+    /** The alpha byte of the packed tint, from 0 (transparent) to 255 (opaque); undefined once disposed. @since 0.5.0 @mc * */
+    alpha: number;
+    /** The packed ARGB tint currently stored on the image; undefined once disposed. @since 0.5.0 @mc * */
+    color: number;
+    /** The resolved namespace:path texture identifier this image draws from; undefined when no texture has been set or once disposed. @since 0.5.0 @mc * */
+    image: string;
+    /** The source x offset inside the texture, in texels; undefined once disposed. @since 0.5.0 @mc * */
+    imageX: number;
+    /** The source y offset inside the texture, in texels; undefined once disposed. @since 0.5.0 @mc * */
+    imageY: number;
+    /** The sampled region height in texels — 0 means the draw derives it from the destination size; undefined once disposed. @since 0.5.0 @mc * */
+    regionHeight: number;
+    /** The sampled region width in texels — 0 means the draw derives it from the destination size; undefined once disposed. @since 0.5.0 @mc * */
+    regionWidth: number;
+    /** The whole-texture height used to normalize the texel offsets; undefined once disposed. @since 0.5.0 @mc * */
+    textureHeight: number;
+    /** The whole-texture width used to normalize the texel offsets; undefined once disposed. @since 0.5.0 @mc * */
+    textureWidth: number;
+    /** Sets the packed ARGB tint. Folded member (G-033 overload-fold rule — one script binding per name): setColor(color) keeps the packed color as given (拍板④ double form), setColor(color, alpha) replaces the top byte, and setColor(r, g, b[, a]) builds the color from channels (opaque unless an alpha is given). @since 0.5.0 @mc * */
+    setColor(color: number | string, alpha?: unknown, blue?: unknown, alpha2?: unknown): Draw2DImage;
+    /** Sets the texture identifier, the source offset, the sampled region and the whole-texture dimensions; the destination size is unchanged. A bare name takes the minecraft namespace; null or empty clears the texture (the element draws nothing). Region dimensions select the sampled texels on the 2D overlay; 0 keeps the fallback of sampling the destination extent. @since 0.5.0 @mc * */
+    setImage(id: string, imageX: number, imageY: number, regionWidth: number, regionHeight: number, textureWidth: number, textureHeight: number): Draw2DImage;
+}
+
+/** Handle to one item-icon element living inside a HUD layer, obtained from layer.item(id, …) upserts. The G-034B component face of : the stack view (setItem/item) and the game decorations (overlay plus the overlay label) — the fixed 16-by-16 box, transform, z-order, alignment and lifecycle are inherited without re-declaration (G-034C contract). Box and scale: the element box is the icon's 16-by-16 GUI-pixel footprint (seeded by the upsert), so getScaledWidth answers 16 &times; scale; the icon draws through the neutral item primitive, decorations off unless enables them. Element is its own builder (拍板②): every setter is fluent and returns this handle. */
+interface Draw2DItem extends Draw2DElement {
+    /** The stack this icon draws, as a fresh snapshot; undefined when no stack is set or once disposed. @since 0.5.0 @mc * */
+    item: ItemStack;
+    /** The overlay label; undefined when none is set or once disposed. @since 0.5.0 @mc * */
+    overlayText: string;
+    /** Replaces the drawn stack, or clears the icon when the argument is null. Folded member (G-033 overload-fold rule — one script binding per name): an is stored as its neutral snapshot; a string is the item id whose default stack is built with the given count (default 1, a bare name takes the minecraft namespace — unknown ids draw nothing, the air stack the registry answers). @since 0.5.0 @mc * */
+    setItem(stackOrId: ItemStack | string, count?: unknown): Draw2DItem;
+    /** Enables or disables the game decorations (durability bar, cooldown overlay, and stack count or the custom label); off by default. @since 0.5.0 @mc * */
+    setOverlay(overlay: boolean): Draw2DItem;
+    /** Sets the label drawn over the icon; this does not enable the overlay (the Builder fold enables it alongside). A non-null value replaces the stack count when the overlay is on; null falls back to the count, an empty string draws no label. @since 0.5.0 @mc * */
+    setOverlayText(overlayText: string): Draw2DItem;
+    /** Whether the game decorations are enabled — a method, not a property (should* stays a method name, the hasShadow precedent); undefined once disposed. @since 0.5.0 @mc * */
+    shouldShowOverlay(): boolean;
+}
+
+/** Handle to one straight line element living inside a HUD layer, obtained from layer.line(id, …) upserts. The G-034 component face of : the two-endpoint geometry view (x1/y1/x2/y2), the stroke thickness and the tint color — the transform, z-order, alignment and lifecycle faces are inherited without re-declaration (G-034C contract). Endpoint model: the stored box is always the min-corner extent with a non-negative size (so getScaledLeft/Top/Width/Height and alignment read the bounding box), while the element's first endpoint — the default rotation pivot — stays observable through and friends. Endpoints may be given in either order (flipX/flipY record the direction). width vs strokeWidth: the inherited base width face answers the line's horizontal extent (|x2 - x1|); the stroke thickness lives under / — the base face may not be re-declared by subclasses (G-034C contract), so the task-card Line.setWidth/getWidth name pair bridges the extent semantics and the stroke moved to its own member (documented deviation). Element is its own builder (拍板②): every setter is fluent and returns this handle. */
+interface Draw2DLine extends Draw2DElement {
+    /** The alpha byte of the packed color, from 0 (transparent) to 255 (opaque); undefined once disposed. @since 0.5.0 @mc * */
+    alpha: number;
+    /** The packed ARGB color currently stored on the line; undefined once disposed. @since 0.5.0 @mc * */
+    color: number;
+    /** The line's stroke thickness in screen pixels; undefined once disposed. @since 0.5.0 @mc * */
+    strokeWidth: number;
+    /** The x coordinate of the first endpoint — it need not be the leftmost; undefined once disposed. @since 0.5.0 @mc * */
+    x1: number;
+    /** The x coordinate of the second endpoint — it need not be the rightmost; undefined once disposed. @since 0.5.0 @mc * */
+    x2: number;
+    /** The y coordinate of the first endpoint — it need not be the topmost; undefined once disposed. @since 0.5.0 @mc * */
+    y1: number;
+    /** The y coordinate of the second endpoint; undefined once disposed. @since 0.5.0 @mc * */
+    y2: number;
+    /** Sets the alpha byte without changing the RGB channels; values are not clamped (only their low eight bits survive). @since 0.5.0 @mc * */
+    setAlpha(alpha: number): Draw2DLine;
+    /** Sets the packed ARGB color. Folded member (G-033 overload-fold rule — one script binding per name): setColor(color) keeps the packed color as given (拍板④ double form), setColor(color, alpha) replaces the top byte, and setColor(r, g, b[, a]) builds the color from channels (opaque unless an alpha is given). @since 0.5.0 @mc * */
+    setColor(color: number | string, alpha?: unknown, blue?: unknown, alpha2?: unknown): Draw2DLine;
+    /** Sets both coordinates of the first endpoint without changing the second. @since 0.5.0 @mc * */
+    setPos1(x1: number, y1: number): Draw2DLine;
+    /** Sets both coordinates of the second endpoint, leaving the first unchanged. @since 0.5.0 @mc * */
+    setPos2(x2: number, y2: number): Draw2DLine;
+    /** Sets the line's stroke thickness in screen pixels. Values are stored as-is; non-positive thickness draws nothing, fractional thickness is rounded up when drawn. The inherited width face keeps answering the line's horizontal extent — see the class javadoc. @since 0.5.0 @mc * */
+    setStrokeWidth(width: number): Draw2DLine;
+    /** Sets the first endpoint's x coordinate without changing the other coordinates; the stored box re-anchors to the min corner and the endpoint direction flips when the first endpoint crosses the second. @since 0.5.0 @mc * */
+    setX1(x1: number): Draw2DLine;
+    /** Sets the second endpoint's x coordinate without changing the other coordinates; a value left of the first endpoint flips the direction. @since 0.5.0 @mc * */
+    setX2(x2: number): Draw2DLine;
+    /** Sets the first endpoint's y coordinate without changing the other coordinates. @since 0.5.0 @mc * */
+    setY1(y1: number): Draw2DLine;
+    /** Sets the second endpoint's y coordinate without changing the other coordinates. @since 0.5.0 @mc * */
+    setY2(y2: number): Draw2DLine;
+}
+
+/** Handle to one filled rectangle element living inside a HUD layer, obtained from layer.rect(id, …) upserts. The G-034 component face of : the two-corner geometry view (x1/y1/x2/y2) and the tint color — box size, transform, z-order, alignment and lifecycle are inherited without re-declaration (G-034C contract). Corner model: the stored box is always the min-corner origin with a non-negative size (the G-032 native form), while the element's first corner is observable through and friends. Corners may be given in either order — reversing them flips the flipX/flipY flags; getWidth() is the absolute distance between the corners, and the base setWidth anchors the smaller coordinate. Element is its own builder (拍板②): every setter is fluent and returns this handle. */
+interface Draw2DRect extends Draw2DElement {
+    /** The alpha byte of the packed color, from 0 (transparent) to 255 (opaque); undefined once disposed. @since 0.5.0 @mc * */
+    alpha: number;
+    /** The packed ARGB color currently stored on the rectangle; undefined once disposed. @since 0.5.0 @mc * */
+    color: number;
+    /** The x coordinate of the first corner — not necessarily the left edge; undefined once disposed. @since 0.5.0 @mc * */
+    x1: number;
+    /** The x coordinate of the second corner — not necessarily the right edge; undefined once disposed. @since 0.5.0 @mc * */
+    x2: number;
+    /** The y coordinate of the first corner — not necessarily the top edge; undefined once disposed. @since 0.5.0 @mc * */
+    y1: number;
+    /** The y coordinate of the second corner — its other corner rather than an edge; undefined once disposed. @since 0.5.0 @mc * */
+    y2: number;
+    /** Sets the alpha byte without changing the RGB channels; values are not clamped (only their low eight bits survive). @since 0.5.0 @mc * */
+    setAlpha(alpha: number): Draw2DRect;
+    /** Sets the packed ARGB color. Folded member (G-033 overload-fold rule — one script binding per name): setColor(color) keeps the packed color as given (拍板④ double form), setColor(color, alpha) replaces the top byte, and setColor(r, g, b[, a]) builds the color from channels (opaque unless an alpha is given). @since 0.5.0 @mc * */
+    setColor(color: number | string, alpha?: unknown, blue?: unknown, alpha2?: unknown): Draw2DRect;
+    /** Sets both coordinates of the first corner, leaving the second unchanged. @since 0.5.0 @mc * */
+    setPos1(x1: number, y1: number): Draw2DRect;
+    /** Sets both coordinates of the second corner, leaving the first unchanged. @since 0.5.0 @mc * */
+    setPos2(x2: number, y2: number): Draw2DRect;
+    /** Sets the first corner's x coordinate without changing the second corner; the stored box re-anchors to the min corner and the corner order flips when the first corner crosses the second. @since 0.5.0 @mc * */
+    setX1(x1: number): Draw2DRect;
+    /** Sets the second corner's x coordinate without changing the first corner; a value left of the first corner flips the corner order. @since 0.5.0 @mc * */
+    setX2(x2: number): Draw2DRect;
+    /** Sets the first corner's y coordinate without changing the second corner. @since 0.5.0 @mc * */
+    setY1(y1: number): Draw2DRect;
+    /** Sets the second corner's y coordinate without changing the first corner. @since 0.5.0 @mc * */
+    setY2(y2: number): Draw2DRect;
+}
+
+/** Handle to one text element living inside a HUD layer, obtained from layer.text(id, …) upserts. The G-034 component face of : text content, drop shadow, tint color, and the font-measured box — everything else (geometry, transform, z-order, alignment, lifecycle) is inherited from the base without re-declaration (G-034C contract). Text metrics: the element's box is seeded from the font when the text is set — answers the cached, unscaled font-measured width and the font line height, then scaledWidth/bounds apply (G-032B legacy ① closed here; the measurement rides RenderPort.textWidth). Element is its own builder (拍板②): every setter is fluent and returns this handle. */
+interface Draw2DText extends Draw2DElement {
+    /** The packed tint of the text, alpha in the top byte; separate from colors carried by rich text (not modelled on the v1 face); undefined once disposed. @since 0.5.0 @mc * */
+    color: number;
+    /** The displayed text; undefined once disposed. @since 0.5.0 @mc * */
+    text: string;
+    /** Whether the font draws a drop shadow behind this text; reads undefined once disposed (hasShadow is a method, not a property, so the engine keeps the name). @since 0.5.0 @mc * */
+    hasShadow(): boolean;
+    /** Sets the packed tint for the text. Folded member (G-033 overload-fold rule — one script binding per name): setColor(color) keeps the packed ARGB as given (拍板④ double form), setColor(color, alpha) replaces the top byte, and setColor(r, g, b[, a]) builds the color from channels (opaque unless an alpha is given). @since 0.5.0 @mc * */
+    setColor(color: number | string, alpha?: unknown, blue?: unknown, alpha2?: unknown): Draw2DText;
+    /** Sets whether the game's font draws a drop shadow behind the glyphs. @since 0.5.0 @mc * */
+    setShadow(shadow: boolean): Draw2DText;
+    /** Replaces the displayed text and re-measures the element's box from the font (the cached width refreshes here, not in the getter). Styling, hover text and click actions do not exist on the NeoMacros v1 plain-text face; a null string becomes empty. undefined once disposed. @since 0.5.0 @mc * */
+    setText(text: string): Draw2DText;
+}
+
+/** A world-space overlay holding retained 3D elements, obtained from render.layer(id). Shapes persist across frames until removed or the layer is cleared; the engine-side pipeline re-projects them every frame (26.x resident gizmo / 1.x WorldRenderEvents), so scripts never register a per-frame callback. Two faces share one layer: the immediate primitives on neo.render (drawBox/drawLine/…) write fire-and- forget shapes into this same layer (queryable only through the port), while elements created here (boxBuilder()/lineBuilder()/ traceLineBuilder()/entityTraceLineBuilder()/ surfaceBuilder()/addDraw2D()) are retained handles with , and live mutation. Layers are keyed per module owner; a module's layers are cleared automatically when it unloads. */
+interface Draw3D {
+    /** The retained elements currently attached, in insertion order. @since 0.5.0 @mc * */
+    elements: Array<RenderElement3D>;
+    /** The script-visible layer id this overlay was created under. @since 0.5.0 @mc * */
+    id: string;
+    /** Adds a world-space panel at (x, y, z) with the requested geometry and rendering options. Defaults follow the quick form: a 1 × 1-block panel, no rotation (corner pivot), 200 minimum subdivisions, no back-face rendering and no depth culling. @since 0.5.0 @mc * */
+    addDraw2D(x: number, y: number, z: number, xRot?: number, yRot?: number, zRot?: number, width?: number, height?: number, minSubdivisions?: number, renderBack?: boolean, cull?: boolean): Surface;
+    /** Adds a camera-to-entity line following entity at a chosen vertical offset above its feet, recalculated each frame. The line draws over terrain by default. @since 0.5.0 @mc * */
+    addEntityTraceLine(entity: Entity, color: number, alpha?: number, yOffset?: number, alwaysOnTop?: boolean): EntityTraceLine;
+    /** Adds an existing surface (one returned by build()) to this overlay. A surface already attached elsewhere is rejected; attaching the same instance twice is a no-op — the keyed port keeps one entry per element (see ). @since 0.5.0 @mc * */
+    addSurface(surface: Surface): void;
+    /** Adds a camera-to-target line toward a fixed world position, drawn over terrain by default. The coordinates are read at call time; later changes to pos do not move the target. @since 0.5.0 @mc * */
+    addTraceLine(pos: Pos3D, color: number, alpha?: number): TraceLine;
+    /** Creates a box builder bound to this overlay: a detached box with origin corners, opaque white colours, unfilled and drawn over the world. Attach it with buildAndAdd(); for a one-block box chain .forBlock(pos) onto the result. @since 0.5.0 @mc * */
+    boxBuilder(): Box;
+    /** Removes every shape on this layer — retained elements and the shapes written by the immediate drawBox-style primitives alike — while keeping the layer itself. @since 0.5.0 @mc * */
+    clear(): void;
+    /** Creates an entity-trace-line builder bound to this overlay: a detached white, fully opaque, always-on-top line following an entity, with a 0.5-block vertical offset. No entity is set by default; a line built without one simply does not draw until one is bound. @since 0.5.0 @mc * */
+    entityTraceLineBuilder(): EntityTraceLine;
+    /** Creates a line builder bound to this overlay: a zero-length line at the origin, opaque white, drawn over the world. @since 0.5.0 @mc * */
+    lineBuilder(): Line3D;
+    /** Attaches an existing element (one returned by build()) to this overlay. An element already attached elsewhere is rejected; attaching the same instance twice is a no-op — the keyed port keeps one entry per element. This is also the attach face used by the addTraceLine quick form. @since 0.5.0 @mc * */
+    reAddElement(element: RenderElement3D): void;
+    /** Detaches one element and removes its shape from the world. Detached elements keep their state and can be re-added with . Removing an element that is not attached here does nothing. @since 0.5.0 @mc * */
+    remove(element: RenderElement3D): Draw3D;
+    /** Removes the panel from this overlay if present; the surface object and its state are not modified. @since 0.5.0 @mc * */
+    removeDraw2D(surface: Surface): void;
+    /** Removes the trace line from this overlay if present; detached state is kept so it can be re-attached. @since 0.5.0 @mc * */
+    removeTraceLine(traceLine: TraceLine): Draw3D;
+    /** Creates a surface builder bound to this overlay: a detached 10 × 10-block panel with centred rotation, a rendered back, no depth culling, full-bright lighting and one subdivision across the smaller side. @since 0.5.0 @mc * */
+    surfaceBuilder(): Surface;
+    /** Creates a trace-line builder bound to this overlay: a detached line targeting the origin, opaque white, drawn over the world. Its camera-side endpoint is recalculated from the camera every frame. @since 0.5.0 @mc * */
+    traceLineBuilder(): TraceLine;
+}
+
 /** A drowned. */
 interface DrownedEntity extends ZombieEntity {
+}
+
+/** Live handle for an editBox control (Mojang word per G-003 §5.2). Reads come from the session cache; writes land on the live widget through the setControl whitelist. Cursor/selection moves are transient widget operations carried as patch keys (cursor/cursorTo/shift/selection) and never round-trip into the spec mirror semantics. setFilter installs a script predicate consulted before user edits enter the widget (the setTextPredicate slot): the adapter asks the session through SessionSink.filterText with the candidate full text; only an explicit false return rejects (fail-open). Script-initiated setValue writes bypass the gate. On 26.x vanilla dropped its native filter, so the adapter's edit box subclass owns the gate on every node. */
+interface EditBox extends Widget {
+    /** Whether the box accepts input (isEditable; script-written, mirror-backed). @since 0.5.0 @mc * */
+    editable: boolean;
+    /** The selected text (getSelectedText, Mojang highlighted). @since 0.5.0 @mc * */
+    highlighted: string;
+    /** The maximum text length (getMaxLength; script-written, mirror-backed). @since 0.5.0 @mc * */
+    maxLength: number;
+    /** The current text (getText, Mojang value). @since 0.5.0 @mc * */
+    value: string;
+    /** Moves the cursor to the end, optionally extending the selection (setCursorToEnd → Mojang moveCursorToEnd). @since 0.5.0 @mc * */
+    moveCursorToEnd(shift?: boolean): EditBox;
+    /** Moves the cursor to the start, optionally extending the selection (setCursorToStart → Mojang moveCursorToStart). @since 0.5.0 @mc * */
+    moveCursorToStart(shift?: boolean): EditBox;
+    /** Clears the text filter installed by (resetTextPredicate). @since 0.5.0 @mc * */
+    resetFilter(): EditBox;
+    /** Moves the cursor to an absolute position (setCursorPosition). With shift omitted the vanilla behavior applies; with shift the current selection anchor is kept (the selection extends to the new position). @since 0.5.0 @mc * */
+    setCursorPosition(position: number, shift?: boolean): EditBox;
+    /** Enables/disables input and returns this handle. @since 0.5.0 @mc * */
+    setEditable(editable: boolean): EditBox;
+    /** Installs the text filter consulted before user edits enter the widget (setTextPredicate). Return false to reject the candidate text; any other return (including no return) accepts. @since 0.5.0 @mc * */
+    setFilter(filter: (text: string) => boolean): EditBox;
+    /** Sets the maximum text length and returns this handle. @since 0.5.0 @mc * */
+    setMaxLength(length: number): EditBox;
+    /** Selects the range [start, end] (cursor to end) and returns this handle. @since 0.5.0 @mc * */
+    setSelection(start: number, end: number): EditBox;
+    /** Sets the placeholder suggestion shown when empty and returns this handle. @since 0.5.0 @mc * */
+    setSuggestion(suggestion: string): EditBox;
+    /** Sets the editable text color (ARGB) and returns this handle. @since 0.5.0 @mc * */
+    setTextColor(color: number): EditBox;
+    /** Sets the uneditable text color (ARGB) and returns this handle. @since 0.5.0 @mc * */
+    setTextColorUneditable(color: number): EditBox;
+    /** Sets the text (script writes bypass the text filter) and returns this handle. @since 0.5.0 @mc * */
+    setValue(text: string): EditBox;
+}
+
+/** Immutable enchantment entry: an enchantment identifier together with the level it carries on a stack (0 for a registry-only entry). Instances come from or from another enchantment's conflict and compatibility lists; the definition reads (level bounds, weight, curse, treasure, supported items, relations) resolve through the item port on every access, so an unknown identifier or a missing connection answers undefined. */
+interface Enchantment {
+    /** The item identifiers this enchantment supports; undefined without the item port. @since 0.5.0 @mc * */
+    readonly acceptableItems: Array<string>;
+    /** The registry entries this enchantment combines with, excluding itself; undefined without the item port. @since 0.5.0 @mc * */
+    readonly compatibleEnchantments: Array<Enchantment>;
+    /** The registry entries this enchantment conflicts with, including itself; undefined without the item port. @since 0.5.0 @mc * */
+    readonly conflictingEnchantments: Array<Enchantment>;
+    /** Whether the enchantment carries the curse tag; undefined without the item port or for an unknown enchantment. @since 0.5.0 @mc * */
+    readonly cursed: boolean;
+    /** The registry identifier of this enchantment, e.g. minecraft:sharpness. @since 0.5.0 @mc * */
+    readonly id: string;
+    /** The level this entry carries, or 0 for a registry-only entry. @since 0.5.0 @mc * */
+    readonly level: number;
+    /** The highest level the enchantment defines; undefined without the item port or for an unknown enchantment. @since 0.5.0 @mc * */
+    readonly maxLevel: number;
+    /** The lowest level the enchantment defines; undefined without the item port or for an unknown enchantment. @since 0.5.0 @mc * */
+    readonly minLevel: number;
+    /** The styled display name at this entry's level (roman numeral suffix, curses coloured red); undefined without the item port. @since 0.5.0 @mc * */
+    readonly romanLevelName: TextComponent;
+    /** Whether the enchantment carries the treasure tag; undefined without the item port or for an unknown enchantment. @since 0.5.0 @mc * */
+    readonly treasure: boolean;
+    /** The selection weight the enchanting table uses; undefined without the item port or for an unknown enchantment. @since 0.5.0 @mc * */
+    readonly weight: number;
+    /** Whether this enchantment supports the item type of the argument and, for a stack, is compatible with every enchantment already on it; undefined when either side cannot be resolved. @since 0.5.0 @mc * */
+    canBeApplied(item: ItemStack | string): boolean;
+    /** Whether the given enchantment conflicts with this one; a conflict holds against itself, and an unknown identifier answers undefined. @since 0.5.0 @mc * */
+    conflictsWith(other: Enchantment | string): boolean;
+    /** The styled display name at the given level (roman numeral suffix, curses coloured red); undefined without the item port. @since 0.5.0 @mc * */
+    getRomanLevelName(level: number): TextComponent;
+    /** Whether this enchantment combines with the given one; an enchantment never combines with itself, and an unknown identifier answers undefined. @since 0.5.0 @mc * */
+    isCompatible(other: Enchantment | string): boolean;
+}
+
+/** An end crystal: beam target and base state. */
+interface EndCrystalEntity extends Entity {
+    /** The position the healing beam points at, or undefined. @since 0.5.0 @mc * */
+    readonly beamTarget: unknown;
+    /** Whether the bedrock base is rendered. @since 0.5.0 @mc * */
+    readonly showingBottom: boolean;
 }
 
 /** The ender dragon: fight phase and death countdown. */
@@ -2230,28 +4313,76 @@ interface EnderDragonEntity extends MobEntity {
 interface EndermanEntity extends MobEntity {
     /** The carried block id, or undefined when carrying nothing. @since 0.2.0 @mc * */
     readonly carriedBlock: string;
+    /** The carried block state (identifier plus vanilla properties), or undefined when carrying nothing. @since 0.5.0 @mc * */
+    readonly heldBlock: BlockState;
+    /** Whether a player's stare has provoked this enderman; the stare goal sets it before a target is assigned, so it can be true while is false. @since 0.5.0 @mc * */
+    readonly provoked: boolean;
+    /** Whether the enderman is screaming (agitated state). @since 0.5.0 @mc * */
+    readonly screaming: boolean;
 }
 
-/** An evoker: spell casting state. */
-interface EvokerEntity extends MobEntity {
-    /** Whether the evoker is casting a spell. @since 0.2.0 @mc * */
-    readonly castingSpell: boolean;
+/** A whose target follows an entity, with yOffset added to its interpolated Y coordinate every frame. The adapter re-resolves the entity by UUID each frame while it loads; if the entity is absent the line simply stops drawing (it is not torn down). Until the entity is bound the target stays at the origin. Obtain one from , bind it with , then — or chain .entity(e) onto the builder result and call the inherited buildAndAdd() directly. Defaults: white, fully opaque, always on top, yOffset of 0.5. */
+interface EntityTraceLine extends TraceLine {
+    /** The followed entity, or null while unbound. @since 0.5.0 @mc * */
+    entity: Entity;
+    /** The vertical offset above the entity's position, in blocks. @since 0.5.0 @mc * */
+    yOffset: number;
+    /** Returns this line without attaching it to an overlay (covariant override of ). @since 0.5.0 @mc * */
+    build(): EntityTraceLine;
+    /** Attaches this line to the overlay its builder came from and returns it (covariant override of ). @since 0.5.0 @mc * */
+    buildAndAdd(): EntityTraceLine;
+    /** Binds this line to entity; its UUID is captured for the per-frame re-resolution. Passing null unbinds it. @since 0.5.0 @mc * */
+    setEntity(entity: Entity): EntityTraceLine;
+    /** Sets the vertical offset added above the entity's position, in blocks; defaults to 0.5. @since 0.5.0 @mc * */
+    setYOffset(yOffset: number): EntityTraceLine;
+}
+
+/** An evoker: spell casting state (inherits the spellcaster surface). */
+interface EvokerEntity extends SpellcasterIllagerEntity {
 }
 
 /** A falling block: the block it carries. */
 interface FallingBlockEntity extends Entity {
     /** The identifier of the block this entity carries. @since 0.2.0 @mc * */
     readonly block: string;
+    /** The full block state (identifier plus vanilla properties) this entity carries; undefined once the entity is gone. @since 0.5.0 @mc * */
+    readonly blockState: BlockState;
+    /** The block position recorded when the entity started falling, which is distinct from its current position. @since 0.5.0 @mc * */
+    readonly startPos: BlockPos;
 }
 
-/** A fox: sitting state. */
+/** A fishing bobber: hook state and open-water flag. */
+interface FishingHookEntity extends ProjectileEntity {
+    /** The angling player handle, or undefined. @since 0.5.0 @mc * */
+    readonly angler: Entity;
+    /** The entity currently hooked on the line, or undefined. @since 0.5.0 @mc * */
+    readonly hookedEntity: Entity;
+    /** Whether the bobber floats in open water. @since 0.5.0 @mc * */
+    readonly openWater: boolean;
+}
+
+/** A fox: coat variant and body-language states. */
 interface FoxEntity extends AnimalEntity {
+    /** Whether the fox is asleep curled up. @since 0.5.0 @mc * */
+    readonly asleep: boolean;
+    /** Whether the fox is crouching toward prey. @since 0.5.0 @mc * */
+    readonly crouching: boolean;
+    /** Whether the fox has faceplanted while diving for prey. @since 0.5.0 @mc * */
+    readonly faceplanted: boolean;
+    /** Whether the fox is pouncing (leaping at prey). @since 0.5.0 @mc * */
+    readonly pouncing: boolean;
     /** Whether the fox is sitting. @since 0.2.0 @mc * */
     readonly sitting: boolean;
+    /** The coat variant identifier (minecraft:red or minecraft:snow). @since 0.5.0 @mc * */
+    readonly variant: string;
 }
 
 /** A frog: variant. */
 interface FrogEntity extends AnimalEntity {
+    /** Whether the frog is currently croaking. @since 0.5.0 @mc * */
+    readonly croaking: boolean;
+    /** The entity currently targeted by the tongue, or undefined. @since 0.5.0 @mc * */
+    readonly tongueTarget: Entity;
     /** The variant identifier. @since 0.2.0 @mc * */
     readonly variant: string;
 }
@@ -2272,10 +4403,64 @@ interface GoatEntity extends AnimalEntity {
     hasRightHorn(): boolean;
 }
 
+/** A guardian: the laser attack target. */
+interface GuardianEntity extends MobEntity {
+    /** The entity currently targeted by the laser, or undefined. @since 0.5.0 @mc * */
+    readonly activeTarget: Entity;
+    /** Whether the guardian is moving, which is the movement state that retracts its spikes. @since 0.5.0 @mc * */
+    readonly moving: boolean;
+}
+
+/** Hanging decoration base (paintings, item frames). */
+interface HangingEntity extends Entity {
+}
+
 /** A horse: coat variant. */
 interface HorseEntity extends AbstractHorseEntity {
     /** The coat variant identifier. @since 0.2.0 @mc * */
     readonly variant: string;
+}
+
+/** A persistent HUD overlay layer: the container node of the retained scene graph behind neo.hud.layer(id). The layer registers a single painter with on creation; elements added through the upsert face (, ) live in core state and are re-projected every frame by the engine — no script callback runs on the render path. Draw order: layer ascending across layers, then element z ascending inside the layer, then insertion order for equal z. Coordinates are scaled GUI pixels (or viewport percentage strings such as "50%"); / answer the current viewport. After the layer is removed (hud.removeLayer, module unload, or layer.dispose() host-side) every read property answers undefined except , and every method throws. */
+interface HudLayer {
+    /** Whether the layer has been removed. Always readable. @since 0.5.0 @mc * */
+    readonly disposed: boolean;
+    /** All live element handles in draw order: element z ascending, then insertion order for equal z; undefined once the layer is disposed. @since 0.5.0 @mc * */
+    readonly elements: Array<Draw2DElement>;
+    /** Current viewport height in scaled GUI pixels (0 before the window exists); undefined once the layer is disposed. @since 0.5.0 @mc * */
+    readonly height: number;
+    /** The public layer id, without the owner namespace prefix; undefined once the layer is disposed. @since 0.5.0 @mc * */
+    readonly id: string;
+    /** All live element ids, parallel to ; undefined once the layer is disposed. @since 0.5.0 @mc * */
+    readonly ids: Array<string>;
+    /** Whether the layer renders. An invisible layer keeps its registration and elements; it simply paints nothing. Defaults to true. @since 0.5.0 @mc * */
+    readonly visible: boolean;
+    /** Current viewport width in scaled GUI pixels (0 before the window exists); undefined once the layer is disposed. @since 0.5.0 @mc * */
+    readonly width: number;
+    /** The layer's draw order against other layers; lower values draw first. Defaults to 0. @since 0.5.0 @mc * */
+    readonly zIndex: number;
+    /** Removes every element from the layer; outstanding handles become disposed. The layer itself stays registered. @since 0.5.0 @mc * */
+    clear(): void;
+    /** The element under id, or undefined when absent (or once the layer is disposed). @since 0.5.0 @mc * */
+    element(id: string): Draw2DElement;
+    /** Inserts or updates a texture-image element under id: same-id semantics as . The options bag must carry the destination box (x, y, w, h) and names its source through texture (a namespace:path identifier — img.identifier of an uploaded CustomImage is the G-030 consumption form) or through image (an immutable PNG snapshot, decoded and uploaded once under a content-addressed id; texture wins when both are given). The G-032 addImage overload group folds into this one member (G-033 overload-fold rule). @since 0.5.0 @mc * */
+    image(id: string, opts: ImageOptions): Draw2DImage;
+    /** Commits the overlay. The retained model registers the layer at neo.hud.layer(id) creation time and keeps element state across frames, so with no init callback configured this is a no-op that preserves every element. @since 0.5.0 @mc * */
+    init(): void;
+    /** Inserts or updates an item-icon element under id: same-id semantics as . The stack may be an (its neutral snapshot is stored) or a bare item id (a one-item default stack; a bare name takes the minecraft namespace); null draws nothing until setItem runs. The box is the fixed 16-by-16 GUI-pixel icon scaled by scale. The G-032 addItem overload group folds into this one member (G-033 overload-fold rule); passing only an options bag in the stack slot works as the stackless form. @since 0.5.0 @mc * */
+    item(id: string, stack?: ItemStack | string, opts?: ItemOptions): Draw2DItem;
+    /** Inserts or updates a straight line element under id: same-id semantics as . The options bag must carry both endpoints (x1, y1, x2, y2 — plain pixel numbers); corners may be given in either order (the stored box is the min-corner extent, the endpoint order stays observable through the handle). The G-032 addLine overloads fold into this one member (G-033 overload-fold rule). @since 0.5.0 @mc * */
+    line(id: string, opts: LineOptions): Draw2DLine;
+    /** Inserts or updates a filled rectangle element under id: same-id semantics as . The options bag must carry the box (x, y, w, h). @since 0.5.0 @mc * */
+    rect(id: string, opts: RectOptions): Draw2DRect;
+    /** Removes one element; its handle becomes disposed. Unknown ids are ignored. @since 0.5.0 @mc * */
+    remove(id: string): void;
+    /** Shows or hides the layer. Pure core state: the port is not touched. @since 0.5.0 @mc * */
+    setVisible(visible: boolean): void;
+    /** Changes the layer's draw order against other layers without re-registering it; takes effect on the next frame. Element order inside the layer is unaffected. @since 0.5.0 @mc * */
+    setZIndex(zIndex: number): void;
+    /** Inserts or updates a text element under id: same id updates the live element in place (stable insertion slot, handle kept); the same id with a different component kind replaces it and disposes the previous handle. @since 0.5.0 @mc * */
+    text(id: string, text: string, opts?: TextOptions): Draw2DText;
 }
 
 /** Immutable raster image: dimensions plus PNG-encoded bytes, produced by screenshots (and later by texture drawing). Instances come only from queries; there is no direct constructor. The byte content is compatible with fs.writeBytes. */
@@ -2290,10 +4475,36 @@ interface Image {
     toJSON(): string;
 }
 
+/** Live handle for an imageButton control: the textured variant of (NeoMacros models it as a Button subtype). Sprite members stay on the builder side (TexturedButtonBuilder); the shared widget face arrives with G-036B. */
+interface ImageButton extends Button {
+}
+
+/** An interaction entity: hitbox size and response state. */
+interface InteractionEntity extends Entity {
+    /** The hitbox height in blocks. @since 0.5.0 @mc * */
+    readonly height: number;
+    /** The last attacker entity handle, or undefined. @since 0.5.0 @mc * */
+    readonly lastAttacker: Entity;
+    /** The last interacting entity handle, or undefined. @since 0.5.0 @mc * */
+    readonly lastInteracted: Entity;
+    /** Whether the entity responds to interactions. @since 0.5.0 @mc * */
+    readonly responsive: boolean;
+    /** The hitbox width in blocks. @since 0.5.0 @mc * */
+    readonly width: number;
+}
+
 /** An iron golem: whether a player built it. */
 interface IronGolemEntity extends AnimalEntity {
     /** Whether the golem was created by a player. @since 0.2.0 @mc * */
     readonly playerCreated: boolean;
+}
+
+/** An item display: the rendered stack. */
+interface ItemDisplayEntity extends DisplayEntity {
+    /** The rendered stack. @since 0.5.0 @mc * */
+    readonly item: ItemStack;
+    /** The serialized item display transform (e.g. fixed, gui, ground). @since 0.5.0 @mc * */
+    readonly transform: string;
 }
 
 /** An item frame: the displayed stack and its rotation step. */
@@ -2306,20 +4517,52 @@ interface ItemFrameEntity extends Entity {
 
 /** Immutable copy of one item stack. Instances come only from queries (inventory slots, event payloads) or the ; there is no direct constructor. JSON.stringify renders the plain fields. */
 interface ItemStack {
+    /** The main-hand attack damage this item yields with the local player's base attribute; undefined without a player. @since 0.5.0 @mc * */
+    readonly attackDamage: number;
+    /** The block represented by this block item as its registered default state, or undefined for a non-block item or an unknown block type. @since 0.5.0 @mc * */
+    readonly block: BlockState;
+    /** Whether the item places a block (block item family). @since 0.5.0 @mc * */
+    readonly blockItem: boolean;
+    /** Whether the can-destroy restriction is hidden in the tooltip display. @since 0.5.0 @mc * */
+    readonly canDestroyHidden: boolean;
+    /** Whether the can-place-on restriction is hidden in the tooltip display. @since 0.5.0 @mc * */
+    readonly canPlaceHidden: boolean;
+    /** The remaining cooldown fraction (1 at the start, 0 when expired or absent); undefined without a player. @since 0.5.0 @mc * */
+    readonly cooldownProgress: number;
     /** The stack size. @since 0.2.0 @mc * */
     readonly count: number;
+    /** A builder draft seeded with this stack, for component editing; the draft is local data and enters the world only through a privileged creative write. @since 0.5.0 @mc * */
+    readonly creative: ItemStackBuilder;
+    /** Display names of the creative tabs containing this item, in tab order; undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    readonly creativeTab: Array<string>;
     /** The current durability damage (0 for undamageable items). @since 0.2.0 @mc * */
     readonly damage: number;
     /** Whether the item takes durability damage at all. @since 0.2.0 @mc * */
     readonly damageable: boolean;
+    /** A fresh default stack of this item (count 1), or undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    readonly defaultStack: ItemStack;
+    /** The block identifiers the can-destroy restriction accepts, or undefined when the stack carries no restriction. @since 0.5.0 @mc * */
+    readonly destroyRestrictions: Array<string>;
+    /** Whether the dyed-color component is hidden in the tooltip display. @since 0.5.0 @mc * */
+    readonly dyeHidden: boolean;
     /** Whether the item is food. @since 0.2.0 @mc * */
     readonly edible: boolean;
+    /** The item's enchantability component value (0 when the item accepts no enchantments); undefined without item facts. @since 0.5.0 @mc * */
+    readonly enchantability: number;
     /** Whether the item can receive enchantments in an enchanting table. @since 0.2.0 @mc * */
     readonly enchantable: boolean;
     /** Whether the item currently carries enchantments. @since 0.2.0 @mc * */
     readonly enchanted: boolean;
-    /** The enchantments as {id, level} entries, in stored order. @since 0.2.0 @mc * */
-    readonly enchantments: Array<EnchantmentData>;
+    /** The enchantments on this stack, in stored order. @since 0.2.0 @mc * */
+    readonly enchantments: Array<Enchantment>;
+    /** Whether enchantments are hidden in the tooltip display. @since 0.5.0 @mc * */
+    readonly enchantmentsHidden: boolean;
+    /** Whether the item resists fire damage; undefined without item facts. @since 0.5.0 @mc * */
+    readonly fireproof: boolean;
+    /** The food component of this stack's item type (hunger, saturation, always-edible); undefined for a non-food item or an unknown item. @since 0.5.0 @mc * */
+    readonly food: FoodData;
+    /** The icon stacks of the creative tabs containing this item, in the same order as ; undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    readonly groupIcon: Array<ItemStack>;
     /** The namespaced item identifier, e.g. minecraft:diamond_sword. @since 0.2.0 @mc * */
     readonly id: string;
     /** Whether the stack represents nothing (air or a zero count). @since 0.2.0 @mc * */
@@ -2330,12 +4573,48 @@ interface ItemStack {
     readonly maxDamage: number;
     /** The maximum stack size for this item. @since 0.2.0 @mc * */
     readonly maxStackSize: number;
+    /** Whether attribute modifiers are hidden in the tooltip display. @since 0.5.0 @mc * */
+    readonly modifiersHidden: boolean;
     /** The display name (styled text flattened). @since 0.2.0 @mc * */
     readonly name: string;
+    /** Whether the local player currently has a cooldown for this item's cooldown group; undefined without a player. @since 0.5.0 @mc * */
+    readonly onCooldown: boolean;
+    /** The block identifiers the can-place-on restriction accepts, or undefined when the stack carries no restriction. @since 0.5.0 @mc * */
+    readonly placeRestrictions: Array<string>;
+    /** The enchantments that can be applied to this item type (level 0), in registry order; undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    readonly possibleEnchantments: Array<Enchantment>;
+    /** The subset of offered by an enchanting table (level 0), in registry order; undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    readonly possibleEnchantmentsFromTable: Array<Enchantment>;
+    /** The crafting remainder of this item's type (one-count stack), or undefined when the item has no remainder. @since 0.5.0 @mc * */
+    readonly recipeRemainder: ItemStack;
     /** The anvil repair cost added by prior anvil work (0 when untouched). @since 0.2.0 @mc * */
     readonly repairCost: number;
+    /** The full registry identifiers of the item tags this item belongs to; undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    readonly tags: Array<string>;
+    /** Whether the item carries a tool component (mining rules and speeds). @since 0.5.0 @mc * */
+    readonly tool: boolean;
+    /** Whether the unbreakable flag is hidden in the tooltip display. @since 0.5.0 @mc * */
+    readonly unbreakableHidden: boolean;
+    /** Whether the item carries an equippable component (wearable slots). @since 0.5.0 @mc * */
+    readonly wearable: boolean;
+    /** Whether the given enchantment fits this stack: its item type is supported and it combines with every enchantment already present; undefined when either side cannot be resolved. @since 0.5.0 @mc * */
+    canBeApplied(enchantment: Enchantment): boolean;
+    /** Whether a stack of the material item repairs stacks of this item at an anvil; undefined when either side cannot be resolved. @since 0.5.0 @mc * */
+    canBeRepairedWith(material: ItemStack): boolean;
+    /** Whether the item fits inside container items such as bundles and shulker boxes; undefined without item facts. @since 0.5.0 @mc * */
+    canFitInsideContainerItems(): boolean;
+    /** The mining-speed multiplier this item yields against the given block or block state (a Block answers against its default state); undefined when the target cannot be resolved. @since 0.5.0 @mc * */
+    getDestroySpeed(blockOrState: Block | BlockState): number;
+    /** Whether the stack carries a can-destroy adventure restriction; undefined without item facts. @since 0.5.0 @mc * */
+    hasDestroyRestrictions(): boolean;
+    /** Whether the stack carries a can-place-on adventure restriction; undefined without item facts. @since 0.5.0 @mc * */
+    hasPlaceRestrictions(): boolean;
+    /** Whether this item's type has a crafting remainder; undefined without the item port or for an unknown item. @since 0.5.0 @mc * */
+    hasRecipeRemainder(): boolean;
     /** Whether the stack's item id equals the identifier (namespace optional). @since 0.2.0 @mc * */
     is(itemId: string): boolean;
+    /** Whether this item is the correct tool for drops against the given block or block state (a Block answers against its default state); undefined when the target cannot be resolved. @since 0.5.0 @mc * */
+    isCorrectToolForDrops(blockOrState: Block | BlockState): boolean;
     /** Whether the other stack holds the same item, ignoring count, damage, and components. @since 0.2.0 @mc * */
     isSameItem(other: ItemStack): boolean;
     /** Whether the other stack is a full copy of this one. @since 0.2.0 @mc * */
@@ -2346,8 +4625,16 @@ interface ItemStack {
 
 /** Builder for local values; the single construction path for script-made stacks. The product is local data: it enters the world only through privileged writes (creative inventory) or stays comparison/display data — survival mode has no "materialize items" path (server authority). */
 interface ItemStackBuilder {
+    /** Adds or upgrades one enchantment: an identifier with an explicit level, or an handle carrying its own level. Existing entries of the same enchantment are replaced. @since 0.5.0 @mc * */
+    addEnchantment(enchantment: Enchantment | string, level?: number): Promise<ItemStackBuilder>;
+    /** Appends one lore line, or every line of an array of lines; values are rendered with their string form (integral numbers without decimals). @since 0.5.0 @mc * */
+    addLore(line: string | number | Array<string | number>): Promise<ItemStackBuilder>;
     /** Validates and produces the immutable stack. @since 0.2.0 @mc * */
     build(): ItemStack;
+    /** Removes every enchantment from the draft. @since 0.5.0 @mc * */
+    clearEnchantments(): Promise<ItemStackBuilder>;
+    /** Clears every lore line from the draft. @since 0.5.0 @mc * */
+    clearLore(): Promise<ItemStackBuilder>;
     /** Copies all fields from an existing stack as the base draft, then lets chained calls override. @since 0.2.0 @mc * */
     copyFrom(stack: ItemStack): ItemStackBuilder;
     /** Sets the stack size. @since 0.2.0 @mc * */
@@ -2356,6 +4643,18 @@ interface ItemStackBuilder {
     damage(value: number): ItemStackBuilder;
     /** Adds one enchantment (chainable, repeats allowed). @since 0.2.0 @mc * */
     enchant(enchantId: string, level: number): ItemStackBuilder;
+    /** Hides or shows the can-destroy restriction in the tooltip without changing the restriction itself. @since 0.5.0 @mc * */
+    hideCanDestroy(hide: boolean): Promise<ItemStackBuilder>;
+    /** Hides or shows the can-place-on restriction in the tooltip without changing the restriction itself. @since 0.5.0 @mc * */
+    hideCanPlace(hide: boolean): Promise<ItemStackBuilder>;
+    /** Hides or shows the dyed colour in the tooltip without changing the colour itself. @since 0.5.0 @mc * */
+    hideDye(hide: boolean): Promise<ItemStackBuilder>;
+    /** Hides or shows the enchantments in the tooltip without changing them; does not remove the enchantments. @since 0.5.0 @mc * */
+    hideEnchantments(hide: boolean): Promise<ItemStackBuilder>;
+    /** Hides or shows the attribute modifiers in the tooltip. @since 0.5.0 @mc * */
+    hideModifiers(hide: boolean): Promise<ItemStackBuilder>;
+    /** Hides or shows the unbreakable flag in the tooltip without changing whether the stack is unbreakable. @since 0.5.0 @mc * */
+    hideUnbreakable(hide: boolean): Promise<ItemStackBuilder>;
     /** Appends lore lines (varargs form). @since 0.2.0 @mc * */
     lore(...lines: Array<string>): ItemStackBuilder;
     /** Replaces lore lines from an array form. @since 0.2.0 @mc * */
@@ -2364,6 +4663,10 @@ interface ItemStackBuilder {
     maxDamage(value: number): ItemStackBuilder;
     /** Sets a custom display name. @since 0.2.0 @mc * */
     name(value: string): ItemStackBuilder;
+    /** Removes one enchantment, keeping the others. @since 0.5.0 @mc * */
+    removeEnchantment(enchantment: Enchantment | string): Promise<ItemStackBuilder>;
+    /** Sets the remaining durability (the item's maximum damage minus this value); items without maximum damage take no damage. @since 0.5.0 @mc * */
+    setDurability(durability: number): Promise<ItemStackBuilder>;
     /** Marks the stack unbreakable (default true when called without arguments). @since 0.2.0 @mc * */
     unbreakable(): ItemStackBuilder;
     /** Marks the stack unbreakable on or off. @since 0.2.0 @mc * */
@@ -2402,12 +4705,79 @@ interface JavaObject {
     write(name: string, value: JsonValue | JavaObject): void;
 }
 
+/** A fixed line segment between two ordered world-space endpoints. Unlike a box the endpoints are not reordered — the first stays the first. Like this class is both element and builder (G-001 拍板②): take one from , configure it with the fluent setters, then to attach it. cull controls depth testing (true lets geometry obscure the line); alwaysOnTop is its inverse. Defaults: opaque white, drawn over the world. Packed colour parameters accept the full-range JS literals (0xFF00FF00) through a Java-side long. */
+interface Line3D extends RenderElement3D {
+    /** The line alpha. @since 0.5.0 @mc * */
+    alpha: number;
+    /** Whether the line is drawn over the world regardless of depth. @since 0.5.0 @mc * */
+    alwaysOnTop: boolean;
+    /** The line colour's low 24 bits; read alpha separately with . @since 0.5.0 @mc * */
+    color: number;
+    /** Whether the line is depth tested; false draws it over the world. @since 0.5.0 @mc * */
+    culled: boolean;
+    /** The first endpoint as a point copy. @since 0.5.0 @mc * */
+    pos1: Pos3D;
+    /** The second endpoint as a point copy. @since 0.5.0 @mc * */
+    pos2: Pos3D;
+    /** Returns this line without attaching it to an overlay. @since 0.5.0 @mc * */
+    build(): Line3D;
+    /** Attaches this line to the overlay its builder came from and returns it. @since 0.5.0 @mc * */
+    buildAndAdd(): Line3D;
+    /** Orders lines by their endpoint coordinates in endpoint order; reversing the segment can change the result. Colour and culling are ignored. @since 0.5.0 @mc * */
+    compareToSame(other: Line3D): number;
+    /** Sets depth testing: true lets geometry obscure the line. @since 0.5.0 @mc * */
+    cull(cull: boolean): Line3D;
+    /** Sets both ordered endpoints at once, creating copies of the supplied points. @since 0.5.0 @mc * */
+    pos(pos1: Pos3D, pos2: Pos3D): Line3D;
+    /** Replaces the alpha without changing the RGB bits. @since 0.5.0 @mc * */
+    setAlpha(alpha: number): Line3D;
+    /** Draws the line over the world regardless of depth; the inverse of . @since 0.5.0 @mc * */
+    setAlwaysOnTop(alwaysOnTop: boolean): Line3D;
+    /** Sets the packed colour; a non-zero RGB value with a zero alpha byte becomes opaque, transparent black stays transparent. @since 0.5.0 @mc * */
+    setColor(color: number, alpha?: number): Line3D;
+    /** Replaces both endpoints in the supplied order (not min/max bounds). @since 0.5.0 @mc * */
+    setPos(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): Line3D;
+    /** Sets the first endpoint. @since 0.5.0 @mc * */
+    setPos1(pos: Pos3D): Line3D;
+    /** Sets the second endpoint. @since 0.5.0 @mc * */
+    setPos2(pos: Pos3D): Line3D;
+}
+
 /** A llama: strength tier and variant. */
 interface LlamaEntity extends AbstractChestedHorseEntity {
     /** The strength tier (1-5). @since 0.2.0 @mc * */
     readonly strength: number;
     /** The variant identifier. @since 0.2.0 @mc * */
     readonly variant: string;
+}
+
+/** Live handle for a lockButton control (Mojang word per G-003 §5.3). State reads come from the session cache; setLocked lands on the live LockIconButton without pressing it, so no callback runs (the same no-echo semantics as the other handle writes). */
+interface LockButton extends Widget {
+    /** Whether the button is currently locked (isLocked). @since 0.5.0 @mc * */
+    locked: boolean;
+    /** Sets the locked state directly and returns this handle (setLocked). @since 0.5.0 @mc * */
+    setLocked(locked: boolean): LockButton;
+}
+
+/** Builder for lockButton controls: the root-constructed fluent chain (G-035 rows 35/36 fold — the boolean seed lands through and the construct([bool]) form). action maps to ; the builder-side getAction/ isLocked readbacks are compat-held with their capability on the build() product (G-003 §5.2). */
+interface LockButtonBuilder extends AbstractWidgetBuilder {
+    construct(args: Array<unknown>): unknown;
+    /** Sets the initial locked state (locked). @since 0.5.0 @mc * */
+    locked(locked: boolean): LockButtonBuilder;
+    /** Registers the press callback (action → onClick). @since 0.5.0 @mc * */
+    onClick(handler: (e: {id: string, type: string}) => void): LockButtonBuilder;
+}
+
+/** A furnace minecart (fuel state has no client accessor). */
+interface MinecartFurnaceEntity extends AbstractMinecartEntity {
+}
+
+/** A TNT minecart: fuse countdown. */
+interface MinecartTntEntity extends AbstractMinecartEntity {
+    /** The remaining fuse ticks, or undefined when not primed. @since 0.5.0 @mc * */
+    readonly fuse: number;
+    /** Whether the TNT cart is primed and about to explode. @since 0.5.0 @mc * */
+    readonly primed: boolean;
 }
 
 /** The mob base: artificial-intelligence toggle and current attack target, shared by every hostile and tameable species. */
@@ -2420,6 +4790,8 @@ interface MobEntity extends LivingEntity {
 
 /** A mushroom cow (mooshroom): brown or red variant. */
 interface MushroomCowEntity extends AnimalEntity {
+    /** Whether the mooshroom is currently shearable. @since 0.5.0 @mc * */
+    readonly shearable: boolean;
     /** The variant identifier (minecraft:red or minecraft:brown). @since 0.2.0 @mc * */
     readonly variant: string;
 }
@@ -2428,24 +4800,290 @@ interface MushroomCowEntity extends AnimalEntity {
 interface OcelotEntity extends AnimalEntity {
 }
 
+/** Event-scoped packet byte buffer: the payload face of packet:receive / packet:send and the free builder behind client.createPacketBuffer() / new neo.PacketBuffer(). Three sources share one implementation. A send-event cell starts writable and its write window closes the moment the synchronous dispatch returns (later writes raise, reads keep working forever); a receive-event cell is a read-only view from the start; a builder cell is always writable. Event cells materialize their canonical bytes lazily through the client port's codec, so an unread buffer never encodes. All integers are big-endian and strings/varints follow the vanilla network encodings, so bytes written here round-trip through the game's own packet codecs. */
+interface PacketBuffer {
+    /** The current read position. @since 0.5.0 @mc * */
+    readonly readerIndex: number;
+    /** The current write position. @since 0.5.0 @mc * */
+    readonly writerIndex: number;
+    /** Rewinds both positions to zero; the bytes stay untouched. @since 0.5.0 @mc * */
+    clear(): void;
+    /** Builds a fresh cell from raw guest constructor arguments. @since 0.5.0 */
+    construct(args: Array<unknown>): unknown;
+    /** Reads one boolean at an absolute index. @zh 在绝对索引处读取一个布尔值。 @since 0.5.0 @mc * */
+    getBoolean(index: number): boolean;
+    /** Reads one signed byte at an absolute index. @zh 在绝对索引处读取一个有符号字节。 @since 0.5.0 @mc * */
+    getByte(index: number): number;
+    /** Reads length bytes at an absolute index. @zh 在绝对索引处读取 length 个字节。 @since 0.5.0 @mc * */
+    getBytes(index: number, length: number): Uint8Array;
+    /** Reads one char code at an absolute index. @zh 在绝对索引处读取一个字符码。 @since 0.5.0 @mc * */
+    getChar(index: number): number;
+    /** Reads one double at an absolute index. @zh 在绝对索引处读取一个 double。 @since 0.5.0 @mc * */
+    getDouble(index: number): number;
+    /** Reads one float at an absolute index. @zh 在绝对索引处读取一个 float。 @since 0.5.0 @mc * */
+    getFloat(index: number): number;
+    /** Reads one signed int at an absolute index. @zh 在绝对索引处读取一个有符号 int。 @since 0.5.0 @mc * */
+    getInt(index: number): number;
+    /** Reads one long at an absolute index. @zh 在绝对索引处读取一个 long。 @since 0.5.0 @mc * */
+    getLong(index: number): number;
+    /** Reads one signed medium at an absolute index. @zh 在绝对索引处读取一个有符号 medium。 @since 0.5.0 @mc * */
+    getMedium(index: number): number;
+    /** Reads one signed short at an absolute index. @zh 在绝对索引处读取一个有符号 short。 @since 0.5.0 @mc * */
+    getShort(index: number): number;
+    /** Reads one unsigned byte at an absolute index. @zh 在绝对索引处读取一个无符号字节。 @since 0.5.0 @mc * */
+    getUnsignedByte(index: number): number;
+    /** Reads one unsigned int at an absolute index as a long. @zh 在绝对索引处读取一个无符号 int（long 表达）。 @since 0.5.0 @mc * */
+    getUnsignedInt(index: number): number;
+    /** Reads one unsigned medium at an absolute index. @zh 在绝对索引处读取一个无符号 medium。 @since 0.5.0 @mc * */
+    getUnsignedMedium(index: number): number;
+    /** Reads one unsigned short at an absolute index. @zh 在绝对索引处读取一个无符号 short。 @since 0.5.0 @mc * */
+    getUnsignedShort(index: number): number;
+    /** Marks the current read position. @since 0.5.0 @mc * */
+    markReaderIndex(): void;
+    /** Marks the current write position. @since 0.5.0 @mc * */
+    markWriterIndex(): void;
+    /** Reads a varint count then applies reader to each element, collecting the results. @since 0.5.0 @mc * */
+    readAll(reader: Function): Array<unknown>;
+    /** Reads one block hit result as a plain object. @since 0.5.0 @mc * */
+    readBlockHitResult(): Record<string, unknown>;
+    /** Reads one packed block position. @zh 读取一个打包的方块坐标。 @since 0.5.0 @mc * */
+    readBlockPos(): BlockPos;
+    /** Reads one boolean and advances the read position. @zh 读取一个布尔值并前移读位置。 @since 0.5.0 @mc * */
+    readBoolean(): boolean;
+    /** Reads one signed byte. @zh 读取一个有符号字节。 @since 0.5.0 @mc * */
+    readByte(): number;
+    /** Reads a varint-length byte array. @zh 读取 varint 长度的字节数组。 @since 0.5.0 @mc * */
+    readByteArray(): Uint8Array;
+    /** Reads a varint-length byte array bounded by maxSize. @since 0.5.0 @mc * */
+    readByteArray(maxSize: number): Uint8Array;
+    /** Reads length bytes and advances the read position; the result crosses as a Uint8Array. @since 0.5.0 @mc * */
+    readBytes(length: number): Uint8Array;
+    /** Reads one char code (0..65535). @zh 读取一个字符码（0..65535）。 @since 0.5.0 @mc * */
+    readChar(): number;
+    /** Reads a chunk coordinate then looks the loaded chunk up in the world; undefined when the chunk is not loaded. @since 0.5.0 @mc * */
+    readChunk(): Chunk;
+    /** Reads one packed chunk coordinate. @zh 读取一个打包的区块坐标。 @since 0.5.0 @mc * */
+    readChunkPos(): ChunkPos;
+    /** Reads one packed chunk-section coordinate as a carrying the section indices. @since 0.5.0 @mc * */
+    readChunkSectionPos(): BlockPos;
+    /** Reads one double. @zh 读取一个 double。 @since 0.5.0 @mc * */
+    readDouble(): number;
+    /** Reads an enum constant by ordinal from the named enum class and returns its constant name. @since 0.5.0 @mc * */
+    readEnum(name: string): string;
+    /** Reads one float. @zh 读取一个 float。 @since 0.5.0 @mc * */
+    readFloat(): number;
+    /** Reads an identifier string. @zh 读取标识符字符串。 @since 0.5.0 @mc * */
+    readIdentifier(): string;
+    /** Reads an instant as epoch milliseconds. @zh 读取时刻（epoch 毫秒数）。 @since 0.5.0 @mc * */
+    readInstant(): number;
+    /** Reads one signed int. @zh 读取一个有符号 int。 @since 0.5.0 @mc * */
+    readInt(): number;
+    /** Reads a varint-count int array. @zh 读取 varint 个数的 int 数组。 @since 0.5.0 @mc * */
+    readIntArray(): Array<number>;
+    /** Reads a varint-count int array bounded by maxSize elements. @since 0.5.0 @mc * */
+    readIntArray(maxSize: number): Array<number>;
+    /** Reads a varint-count int list. @zh 读取 varint 个数的整数列表。 @since 0.5.0 @mc * */
+    readIntList(): Array<number>;
+    /** Reads a varint count then each element through reader. @since 0.5.0 @mc * */
+    readList(reader: Function): Array<unknown>;
+    /** Reads one signed long. @zh 读取一个有符号 long。 @since 0.5.0 @mc * */
+    readLong(): number;
+    /** Reads a varint-count long array. @zh 读取 varint 个数的 long 数组。 @since 0.5.0 @mc * */
+    readLongArray(): Array<number>;
+    /** Reads a varint-count long array bounded by maxSize elements. @since 0.5.0 @mc * */
+    readLongArray(maxSize: number): Array<number>;
+    /** Reads a varint count then each entry as key followed by value, returned as [[key, value], ...] pairs so non-string keys survive the crossing. @since 0.5.0 @mc * */
+    readMap(keyReader: Function, valueReader: Function): Array<Array<unknown>>;
+    /** Reads one signed 3-byte medium. @zh 读取一个有符号 3 字节 medium。 @since 0.5.0 @mc * */
+    readMedium(): number;
+    /** Reads an optional value: undefined when absent. @since 0.5.0 @mc * */
+    readOptional(reader: Function): unknown;
+    /** Reads a registry-key id string; the registry argument documents which registry the key belongs to (parity with the upstream signature) and does not change the read. @since 0.5.0 @mc * */
+    readRegistryKey(registry: string): string;
+    /** Reads one signed short. @zh 读取一个有符号 short。 @since 0.5.0 @mc * */
+    readShort(): number;
+    /** Reads a varint-length UTF-8 string. @zh 读取 varint 长度的 UTF-8 字符串。 @since 0.5.0 @mc * */
+    readString(): string;
+    /** Reads a varint-length UTF-8 string bounded by maxLength characters. @since 0.5.0 @mc * */
+    readString(maxLength: number): string;
+    /** Reads one unsigned byte (0..255). @zh 读取一个无符号字节（0..255）。 @since 0.5.0 @mc * */
+    readUnsignedByte(): number;
+    /** Reads one unsigned int as a long. @zh 读取一个无符号 int（long 表达）。 @since 0.5.0 @mc * */
+    readUnsignedInt(): number;
+    /** Reads one unsigned 3-byte medium. @zh 读取一个无符号 3 字节 medium。 @since 0.5.0 @mc * */
+    readUnsignedMedium(): number;
+    /** Reads one unsigned short (0..65535). @zh 读取一个无符号 short（0..65535）。 @since 0.5.0 @mc * */
+    readUnsignedShort(): number;
+    /** Reads one UUID as its canonical string. @zh 读取一个 UUID（规范字符串）。 @since 0.5.0 @mc * */
+    readUuid(): string;
+    /** Reads one varint. @zh 读取一个 varint。 @since 0.5.0 @mc * */
+    readVarInt(): number;
+    /** Reads one varlong. @zh 读取一个 varlong。 @since 0.5.0 @mc * */
+    readVarLong(): number;
+    /** Restores the initial bytes and positions captured when the cell materialized (empty for builders). @since 0.5.0 @mc * */
+    reset(): void;
+    /** Restores both positions to their marks (zero unless marked). @since 0.5.0 @mc * */
+    resetIndices(): void;
+    /** Restores the read position to its mark. @since 0.5.0 @mc * */
+    resetReaderIndex(): void;
+    /** Restores the write position to its mark. @since 0.5.0 @mc * */
+    resetWriterIndex(): void;
+    /** Decodes the readable bytes and sends the packet on the client's connection; the send still passes through packet:send. Requires the packet capability. @since 0.5.0 @mc * @requires permission 'packet' */
+    send(name?: string): Promise<void>;
+    /** Writes one boolean at an absolute index. @zh 在绝对索引处写入一个布尔值。 @since 0.5.0 @mc * */
+    setBoolean(index: number, value: boolean): void;
+    /** Writes one byte at an absolute index. @zh 在绝对索引处写入一个字节。 @since 0.5.0 @mc * */
+    setByte(index: number, value: number): void;
+    /** Writes raw bytes at an absolute index; accepts a byte array or any array-like of numbers (Uint8Array). @since 0.5.0 @mc * */
+    setBytes(index: number, bytes: Uint8Array | Array<number>): Uint8Array | Array<number>;
+    /** Writes one char code at an absolute index. @zh 在绝对索引处写入一个字符码。 @since 0.5.0 @mc * */
+    setChar(index: number, value: number): void;
+    /** Writes one double at an absolute index. @zh 在绝对索引处写入一个 double。 @since 0.5.0 @mc * */
+    setDouble(index: number, value: number): void;
+    /** Writes one float at an absolute index. @zh 在绝对索引处写入一个 float。 @since 0.5.0 @mc * */
+    setFloat(index: number, value: number): void;
+    /** Sets both positions at once. @since 0.5.0 @mc * */
+    setIndices(readerIndex: number, writerIndex: number): void;
+    /** Writes one int at an absolute index. @zh 在绝对索引处写入一个 int。 @since 0.5.0 @mc * */
+    setInt(index: number, value: number): void;
+    /** Writes one long at an absolute index. @zh 在绝对索引处写入一个 long。 @since 0.5.0 @mc * */
+    setLong(index: number, value: number): void;
+    /** Writes one medium at an absolute index. @zh 在绝对索引处写入一个 medium。 @since 0.5.0 @mc * */
+    setMedium(index: number, value: number): void;
+    /** Moves the read position (within [0, writerIndex]). @since 0.5.0 @mc * */
+    setReaderIndex(index: number): void;
+    /** Writes one short at an absolute index. @zh 在绝对索引处写入一个 short。 @since 0.5.0 @mc * */
+    setShort(index: number, value: number): void;
+    /** Moves the write position (within [readerIndex, capacity]). @since 0.5.0 @mc * */
+    setWriterIndex(index: number): void;
+    /** Writes zero bytes at an absolute index. @zh 在绝对索引处写入零字节。 @since 0.5.0 @mc * */
+    setZero(index: number, length: number): void;
+    /** Advances the read position past length bytes without copying. @since 0.5.0 @mc * */
+    skipBytes(length: number): void;
+    /** Decodes the readable bytes as a packet: the source packet's class when no name is given, otherwise the named packet of the source (or play) protocol. Returns a raw JavaObject. @since 0.5.0 @mc * @requires permission 'java' */
+    toPacket(name?: string, protocol?: string): JavaObject;
+    /** Writes a block hit result: packed block position, direction ordinal, the hit location as three floats relative to the block origin, then the inside-block and world-border flags. @since 0.5.0 @mc * */
+    writeBlockHitResult(hit: Record<string, unknown>): void;
+    /** Writes a block hit result from raw components; pos is the exact hit location and blockPos the targeted block. @since 0.5.0 @mc * */
+    writeBlockHitResult(pos: Pos3D, direction: string, blockPos: BlockPos, missed: boolean, insideBlock: boolean): void;
+    /** Writes a block position as one packed long (vanilla encoding). @since 0.5.0 @mc * */
+    writeBlockPos(pos: BlockPos): void;
+    /** Writes block coordinates as one packed long. @since 0.5.0 @mc * */
+    writeBlockPos(x: number, y: number, z: number): void;
+    /** Writes one boolean as a single byte. @zh 写入一个布尔值（单字节）。 @since 0.5.0 @mc * */
+    writeBoolean(value: boolean): void;
+    /** Writes one signed byte. @zh 写入一个有符号字节。 @since 0.5.0 @mc * */
+    writeByte(value: number): void;
+    /** Writes a varint length followed by the raw bytes. @since 0.5.0 @mc * */
+    writeByteArray(bytes: Uint8Array | Array<number>): Uint8Array | Array<number>;
+    /** Writes one UTF-16 code unit (2 bytes); value is the char code. @zh 写入一个 UTF-16 码元（2 字节）；值为码点。 @since 0.5.0 @mc * */
+    writeChar(value: number): void;
+    /** Writes a chunk coordinate as one packed long (vanilla encoding). @since 0.5.0 @mc * */
+    writeChunkPos(x: number, z: number): void;
+    /** Writes a chunk coordinate handle as one packed long. @since 0.5.0 @mc * */
+    writeChunkPos(chunk: ChunkPos): void;
+    /** Writes a chunk-section coordinate as one packed long (vanilla section encoding: x 22 bits, z 22 bits, y 20 bits). @since 0.5.0 @mc * */
+    writeChunkSectionPos(chunkX: number, y: number, chunkZ: number): void;
+    /** Writes the section above the given chunk at section Y. @since 0.5.0 @mc * */
+    writeChunkSectionPos(chunk: ChunkPos, y: number): void;
+    /** Writes a varint count then each element through writer. @since 0.5.0 @mc * */
+    writeCollection(collection: Array<unknown>, writer: BiConsumer): void;
+    /** Writes one double (8 bytes). @zh 写入一个 double（8 字节）。 @since 0.5.0 @mc * */
+    writeDouble(value: number): void;
+    /** Writes an enum constant by ordinal (vanilla enum encoding); the argument must be a host enum, usually reached through the java surface. @since 0.5.0 @mc * */
+    writeEnumConstant(constant: unknown): void;
+    /** Writes one float (4 bytes; number inputs narrow to float). @zh 写入一个 float（4 字节；数字入参收窄为 float）。 @since 0.5.0 @mc * */
+    writeFloat(value: number): void;
+    /** Writes a global position: dimension id then packed block position. @since 0.5.0 @mc * */
+    writeGlobalPos(dimension: string, pos: BlockPos): void;
+    /** Writes a global position from raw components. @since 0.5.0 @mc * */
+    writeGlobalPos(dimension: string, x: number, y: number, z: number): void;
+    /** Writes an identifier as its string form. @since 0.5.0 @mc * */
+    writeIdentifier(id: string): void;
+    /** Writes an instant as epoch milliseconds (vanilla writeInstant encoding). @since 0.5.0 @mc * */
+    writeInstant(epochMillis: number): void;
+    /** Writes one big-endian int. @zh 写入一个大端序 int。 @since 0.5.0 @mc * */
+    writeInt(value: number): void;
+    /** Writes a varint count followed by varint-encoded ints. @since 0.5.0 @mc * */
+    writeIntArray(values: Array<unknown>): void;
+    /** Writes a varint count then each int as a varint. @since 0.5.0 @mc * */
+    writeIntList(list: Array<unknown>): void;
+    /** Writes one big-endian long. @zh 写入一个大端序 long。 @since 0.5.0 @mc * */
+    writeLong(value: number): void;
+    /** Writes a varint count followed by fixed 8-byte longs. @since 0.5.0 @mc * */
+    writeLongArray(values: Array<unknown>): void;
+    /** Writes a varint count then each entry as key followed by value. @since 0.5.0 @mc * */
+    writeMap(map: Record<unknown, unknown>, keyWriter: BiConsumer, valueWriter: BiConsumer): void;
+    /** Writes one signed 3-byte medium. @zh 写入一个有符号 3 字节 medium。 @since 0.5.0 @mc * */
+    writeMedium(value: number): void;
+    /** Writes true plus the value when present, false otherwise (undefined reads back as absent). @since 0.5.0 @mc * */
+    writeOptional(value: unknown, writer: BiConsumer): void;
+    /** Writes a varint registry-key id string (vanilla resource-key encoding: the identifier only). @since 0.5.0 @mc * */
+    writeRegistryKey(id: string): void;
+    /** Writes one big-endian short. @zh 写入一个大端序 short。 @since 0.5.0 @mc * */
+    writeShort(value: number): void;
+    /** Writes a varint-length UTF-8 string (default cap 32767 chars). @since 0.5.0 @mc * */
+    writeString(string: string): void;
+    /** Writes a varint-length UTF-8 string bounded by maxLength characters. @since 0.5.0 @mc * */
+    writeString(string: string, maxLength: number): void;
+    /** Writes a UUID as its two 64-bit halves. @since 0.5.0 @mc * */
+    writeUuid(uuid: string): void;
+    /** Writes one varint. @zh 写入一个 varint。 @since 0.5.0 @mc * */
+    writeVarInt(i: number): void;
+    /** Writes one varlong. @zh 写入一个 varlong。 @since 0.5.0 @mc * */
+    writeVarLong(l: number): void;
+    /** Advances the write position over length zero bytes. @since 0.5.0 @mc * */
+    writeZero(length: number): void;
+}
+
+/** A painting: artwork id and dimensions. */
+interface PaintingEntity extends HangingEntity {
+    /** The artwork identifier, e.g. minecraft:wanderer. @since 0.5.0 @mc * */
+    readonly artId: string;
+    /** The artwork height in blocks. @since 0.5.0 @mc * */
+    readonly height: number;
+    /** The artwork width in blocks. @since 0.5.0 @mc * */
+    readonly width: number;
+}
+
 /** A panda: gene pair and behavior states. */
 interface PandaEntity extends AnimalEntity {
+    /** Whether the panda shows the brown (rare) look. @since 0.5.0 @mc * */
+    readonly brown: boolean;
     /** Whether the panda is eating. @since 0.2.0 @mc * */
     readonly eating: boolean;
     /** The hidden gene identifier. @since 0.2.0 @mc * */
     readonly hiddenGene: string;
+    /** Whether the hidden gene is recessive; only brown and weak are. @since 0.5.0 @mc * */
+    readonly hiddenGeneRecessive: boolean;
     /** Whether the panda is the lazy variant. @since 0.2.0 @mc * */
     readonly lazy: boolean;
     /** The main gene identifier. @since 0.2.0 @mc * */
     readonly mainGene: string;
+    /** Whether the main gene is recessive; only brown and weak are. @since 0.5.0 @mc * */
+    readonly mainGeneRecessive: boolean;
     /** Whether the panda is lying on its back. @since 0.2.0 @mc * */
     readonly onBack: boolean;
+    /** Whether the panda is being playful. @since 0.5.0 @mc * */
+    readonly playful: boolean;
+    /** Whether the panda is rolling around. @since 0.5.0 @mc * */
+    readonly rolling: boolean;
+    /** Whether the panda is scared and hiding. @since 0.5.0 @mc * */
+    readonly scared: boolean;
+    /** Whether the panda is sitting. @since 0.5.0 @mc * */
+    readonly sitting: boolean;
     /** Whether the panda is sneezing. @since 0.2.0 @mc * */
     readonly sneezing: boolean;
+    /** Whether the panda is the weak variant (lower health). @since 0.5.0 @mc * */
+    readonly weak: boolean;
+    /** Whether the panda looks worried (near a thunderstorm). @since 0.5.0 @mc * */
+    readonly worried: boolean;
 }
 
-/** A parrot: variant. */
+/** A parrot: variant and party state. */
 interface ParrotEntity extends AnimalEntity {
+    /** Whether the parrot is dancing to a nearby jukebox. @since 0.5.0 @mc * */
+    readonly partying: boolean;
     /** The variant identifier. @since 0.2.0 @mc * */
     readonly variant: string;
 }
@@ -2454,6 +5092,12 @@ interface ParrotEntity extends AnimalEntity {
 interface PhantomEntity extends MobEntity {
     /** The phantom size tier (0 by default). @since 0.2.0 @mc * */
     readonly size: number;
+}
+
+/** A pig: saddle state. */
+interface PigEntity extends AnimalEntity {
+    /** Whether a saddle is currently equipped. @since 0.5.0 @mc * */
+    readonly saddled: boolean;
 }
 
 /** A piglin brute: aggressive growth and zombification state. */
@@ -2473,7 +5117,7 @@ interface PiglinEntity extends MobEntity {
 }
 
 /** A pillager: crossbow charging state. */
-interface PillagerEntity extends MobEntity {
+interface PillagerEntity extends AbstractIllagerEntity {
     /** Whether the pillager is charging its crossbow. @since 0.2.0 @mc * */
     readonly chargingCrossbow: boolean;
 }
@@ -2492,7 +5136,7 @@ interface Pos2D {
     y: number;
     /** Adds another point. @since 0.2.0 @mc * */
     add(other: Pos2D): Pos2D;
-    /** Component-wise lexicographic compare (x first, then y). @since 0.2.0 */
+    /** Component-wise lexicographic compare (x first, then y). @since 0.5.0 @mc * */
     compare(other: Pos2D): number;
     /** Multiplies component-wise by another point. @since 0.2.0 @mc * */
     mul(other: Pos2D): Pos2D;
@@ -2524,7 +5168,7 @@ interface Pos3D {
     div(other: Pos3D): Pos3D;
     /** The dot product. @since 0.1.0 @mc * */
     dot(other: Pos3D): number;
-    /** Floors the coordinates onto the block grid. @since 0.1.0 @mc * */
+    /** Floors the coordinates onto the block grid. This is the block-grid conversion of a position; raw Minecraft coordinate types stay behind the neo.java penetration layer rather than in this signature. @since 0.1.0 @mc * */
     floor(): BlockPos;
     /** The vector length. @since 0.1.0 @mc * */
     length(): number;
@@ -2556,6 +5200,10 @@ interface PrimedTntEntity extends Entity {
     readonly fuse: number;
 }
 
+/** Projectile base: shared state for arrows, tridents, and skulls. */
+interface ProjectileEntity extends Entity {
+}
+
 /** A pufferfish: puff inflation level (0-2). */
 interface PufferfishEntity extends AbstractFishEntity {
     /** The puff state, 0 deflated through 2 fully inflated. @since 0.2.0 @mc * */
@@ -2580,8 +5228,196 @@ interface RayHit {
     readonly face: string;
     /** Whether the ray hit anything at all. @since 0.1.0 @mc * */
     hit: boolean;
+    /** Whether the block hit landed strictly inside the block bounds rather than on its surface; undefined on entity hits and misses. @since 0.5.0 @mc * */
+    readonly insideBlock: boolean;
     /** The exact hit position. @since 0.1.0 @mc * */
     readonly pos: Pos3D;
+}
+
+/** Handle over one host class: the enumeration surface of java.lang.Class (fields, methods, constructors, superclass, interfaces), exact-signature member lookup, and annotation queries. Obtained from reflect.forName / reflect.classOf or a parent handle; rides the java permission gate with the module. */
+interface ReflectClass {
+    /** The fully-qualified name of the wrapped class. @since 0.7.0 @mc * */
+    readonly className: string;
+    /** The raw host Class object as a JavaObject proxy. Requires the java permission. @since 0.7.0 @mc * @requires permission 'java' */
+    raw: JavaObject;
+    /** The annotation of the given class on this class, or undefined when absent. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    annotation(type: ReflectClass | JavaClass | string): JavaObject;
+    /** All annotations present on this class (inherited ones included). @since 0.7.0 @mc * */
+    annotations(): Array<JavaObject>;
+    /** Resolves one declared constructor with an exact parameter signature; private constructors included. Parameter types arrive as class-name strings or ReflectClass values. Undefined on a miss. @since 0.7.0 @mc * */
+    constructor(paramTypes?: Array<string | JavaClass | ReflectClass>): ReflectConstructor;
+    /** All public constructors of the class. @since 0.7.0 @mc * */
+    constructors(): Array<ReflectConstructor>;
+    /** All annotations declared on this class itself (inherited ones excluded). @since 0.7.0 @mc * */
+    declaredAnnotations(): Array<JavaObject>;
+    /** All constructors declared on the class itself, private ones included. @since 0.7.0 @mc * */
+    declaredConstructors(): Array<ReflectConstructor>;
+    /** All fields declared on the class itself, private ones included. @since 0.7.0 @mc * */
+    declaredFields(): Array<ReflectField>;
+    /** All methods declared on the class itself, private ones included. @since 0.7.0 @mc * */
+    declaredMethods(): Array<ReflectMethod>;
+    /** Resolves one declared field by name, walking the superclass chain; private fields included. Undefined on a miss. @since 0.7.0 @mc * */
+    field(name: string): ReflectField;
+    /** All public fields of the class, inherited ones included. @since 0.7.0 @mc * */
+    fields(): Array<ReflectField>;
+    /** All interfaces implemented by the class. @since 0.7.0 @mc * */
+    interfaces(): Array<ReflectClass>;
+    /** Whether the given annotation class is present on this class. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    isAnnotationPresent(type: ReflectClass | JavaClass | string): boolean;
+    /** Resolves one declared method with an exact parameter signature, walking the superclass chain; private overloads included. Parameter types arrive as class-name strings or ReflectClass values. Undefined on a miss. @since 0.7.0 @mc * */
+    method(name: string, paramTypes?: Array<string | JavaClass | ReflectClass>): ReflectMethod;
+    /** All public methods of the class, inherited ones included. @since 0.7.0 @mc * */
+    methods(): Array<ReflectMethod>;
+    /** The superclass of the class; an interface or Object reads undefined. @since 0.7.0 @mc * */
+    superclass(): ReflectClass;
+}
+
+/** Handle over one declared constructor: create instances through java.lang.reflect.Constructor, read its parameter types and modifiers, plus annotation queries. The constructor was resolved with accessibility opened, so private constructors instantiate like public ones; numeric arguments convert to the declared parameter types. */
+interface ReflectConstructor {
+    /** Whether the constructor is abstract. @since 0.7.0 @mc * */
+    readonly abstract: boolean;
+    /** Whether the constructor is final. @since 0.7.0 @mc * */
+    readonly final: boolean;
+    /** Whether the constructor is an interface constructor. @since 0.7.0 @mc * */
+    readonly interface: boolean;
+    /** Whether the constructor is native. @since 0.7.0 @mc * */
+    readonly native: boolean;
+    /** Whether the constructor is private. @since 0.7.0 @mc * */
+    readonly private: boolean;
+    /** Whether the constructor is protected. @since 0.7.0 @mc * */
+    readonly protected: boolean;
+    /** Whether the constructor is public. @since 0.7.0 @mc * */
+    readonly public: boolean;
+    /** The raw host Constructor object as a JavaObject proxy. Requires the java permission. @since 0.7.0 @mc * @requires permission 'java' */
+    raw: JavaObject;
+    /** Whether the constructor is static. @since 0.7.0 @mc * */
+    readonly static: boolean;
+    /** Whether the constructor is strict (strictfp). @since 0.7.0 @mc * */
+    readonly strict: boolean;
+    /** Whether the constructor is synchronized. @since 0.7.0 @mc * */
+    readonly synchronized: boolean;
+    /** Whether the constructor is transient. @since 0.7.0 @mc * */
+    readonly transient: boolean;
+    /** Whether the constructor is volatile. @since 0.7.0 @mc * */
+    readonly volatile: boolean;
+    /** The annotation of the given class on this constructor, or undefined when absent. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    annotation(type: ReflectClass | JavaClass | string): JavaObject;
+    /** All annotations present on this constructor. @since 0.7.0 @mc * */
+    annotations(): Array<JavaObject>;
+    /** All annotations declared on this constructor itself. @since 0.7.0 @mc * */
+    declaredAnnotations(): Array<JavaObject>;
+    /** Whether the given annotation class is present on this constructor. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    isAnnotationPresent(type: ReflectClass | JavaClass | string): boolean;
+    /** The modifier bits of the constructor (the raw java.lang.reflect.Modifier mask). @since 0.7.0 @mc * */
+    modifiers(): number;
+    /** Creates one instance with the given constructor arguments; arguments arrive as an array and convert to the declared parameter types. @since 0.7.0 @mc * */
+    newInstance(args?: JsonValue | JavaObject): JavaObject;
+    /** The declared parameter types of the constructor as class handles. @since 0.7.0 @mc * */
+    parameterTypes(): Array<ReflectClass>;
+}
+
+/** Handle over one declared field: read and write through java.lang.reflect.Field, the field's type and modifiers, plus annotation queries. The field was resolved with accessibility opened, so private members read and write like public ones. */
+interface ReflectField {
+    /** Whether the field is abstract. @since 0.7.0 @mc * */
+    readonly abstract: boolean;
+    /** Whether the field is final. @since 0.7.0 @mc * */
+    readonly final: boolean;
+    /** Whether the field is an interface field. @since 0.7.0 @mc * */
+    readonly interface: boolean;
+    /** The name of the field. @since 0.7.0 @mc * */
+    readonly name: string;
+    /** Whether the field is native. @since 0.7.0 @mc * */
+    readonly native: boolean;
+    /** Whether the field is private. @since 0.7.0 @mc * */
+    readonly private: boolean;
+    /** Whether the field is protected. @since 0.7.0 @mc * */
+    readonly protected: boolean;
+    /** Whether the field is public. @since 0.7.0 @mc * */
+    readonly public: boolean;
+    /** The raw host Field object as a JavaObject proxy. Requires the java permission. @since 0.7.0 @mc * @requires permission 'java' */
+    raw: JavaObject;
+    /** Whether the field is static. @since 0.7.0 @mc * */
+    readonly static: boolean;
+    /** Whether the field is strict (strictfp). @since 0.7.0 @mc * */
+    readonly strict: boolean;
+    /** Whether the field is synchronized. @since 0.7.0 @mc * */
+    readonly synchronized: boolean;
+    /** Whether the field is transient. @since 0.7.0 @mc * */
+    readonly transient: boolean;
+    /** Whether the field is volatile. @since 0.7.0 @mc * */
+    readonly volatile: boolean;
+    /** The annotation of the given class on this field, or undefined when absent. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    annotation(type: ReflectClass | JavaClass | string): JavaObject;
+    /** All annotations present on this field. @since 0.7.0 @mc * */
+    annotations(): Array<JavaObject>;
+    /** All annotations declared on this field itself. @since 0.7.0 @mc * */
+    declaredAnnotations(): Array<JavaObject>;
+    /** Reads the field value. Omitting the target reads a static field; instance fields need their instance. @since 0.7.0 @mc * */
+    get(target: JavaObject): JsonValue | JavaObject;
+    /** Whether the given annotation class is present on this field. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    isAnnotationPresent(type: ReflectClass | JavaClass | string): boolean;
+    /** The modifier bits of the field (the raw java.lang.reflect.Modifier mask). @since 0.7.0 @mc * */
+    modifiers(): number;
+    /** Writes the field value (numbers convert to the declared type). Pass null/undefined as the target for a static field. @since 0.7.0 @mc * */
+    set(target: JavaObject, value: JsonValue | JavaObject): void;
+    /** The declared type of the field as a class handle. @since 0.7.0 @mc * */
+    type(): ReflectClass;
+}
+
+/** Handle over one declared method: invoke through java.lang.reflect.Method, read its return and parameter types and modifiers, plus annotation queries. The method was resolved with accessibility opened, so private methods invoke like public ones; numeric arguments convert to the declared parameter types. */
+interface ReflectMethod {
+    /** Whether the method is abstract. @since 0.7.0 @mc * */
+    readonly abstract: boolean;
+    /** Whether the method is final. @since 0.7.0 @mc * */
+    readonly final: boolean;
+    /** Whether the method is an interface method. @since 0.7.0 @mc * */
+    readonly interface: boolean;
+    /** The name of the method. @since 0.7.0 @mc * */
+    readonly name: string;
+    /** Whether the method is native. @since 0.7.0 @mc * */
+    readonly native: boolean;
+    /** Whether the method is private. @since 0.7.0 @mc * */
+    readonly private: boolean;
+    /** Whether the method is protected. @since 0.7.0 @mc * */
+    readonly protected: boolean;
+    /** Whether the method is public. @since 0.7.0 @mc * */
+    readonly public: boolean;
+    /** The raw host Method object as a JavaObject proxy. Requires the java permission. @since 0.7.0 @mc * @requires permission 'java' */
+    raw: JavaObject;
+    /** Whether the method is static. @since 0.7.0 @mc * */
+    readonly static: boolean;
+    /** Whether the method is strict (strictfp). @since 0.7.0 @mc * */
+    readonly strict: boolean;
+    /** Whether the method is synchronized. @since 0.7.0 @mc * */
+    readonly synchronized: boolean;
+    /** Whether the method is transient. @since 0.7.0 @mc * */
+    readonly transient: boolean;
+    /** Whether the method is volatile. @since 0.7.0 @mc * */
+    readonly volatile: boolean;
+    /** The annotation of the given class on this method, or undefined when absent. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    annotation(type: ReflectClass | JavaClass | string): JavaObject;
+    /** All annotations present on this method. @since 0.7.0 @mc * */
+    annotations(): Array<JavaObject>;
+    /** All annotations declared on this method itself. @since 0.7.0 @mc * */
+    declaredAnnotations(): Array<JavaObject>;
+    /** Invokes the method on the target instance. Pass null/undefined as the target for a static method; arguments arrive as an array and convert to the declared parameter types. @since 0.7.0 @mc * */
+    invoke(target: JavaObject, args?: JsonValue | JavaObject): JsonValue | JavaObject;
+    /** Whether the given annotation class is present on this method. Only runtime-retained annotations are visible. @since 0.7.0 @mc * */
+    isAnnotationPresent(type: ReflectClass | JavaClass | string): boolean;
+    /** The modifier bits of the method (the raw java.lang.reflect.Modifier mask). @since 0.7.0 @mc * */
+    modifiers(): number;
+    /** The declared parameter types of the method as class handles. @since 0.7.0 @mc * */
+    parameterTypes(): Array<ReflectClass>;
+    /** The declared return type of the method as a class handle. @since 0.7.0 @mc * */
+    returnType(): ReflectClass;
+}
+
+/** One drawable element living inside a overlay: a retained, mutable handle whose current state is re-projected into the world every frame by the engine-side pipeline (26.x resident gizmo / 1.x WorldRenderEvents) — scripts never register a per-frame callback. Elements are ordered by canonical class name first, then by within a class; insertion order plays no part. Elements are built through their container's boxBuilder()/lineBuilder() face (the builder folds into the element itself), attached with buildAndAdd() or , and detached with — a detached element keeps its state and can be re-added. */
+interface RenderElement3D {
+    /** Compares two elements by canonical class name and, for elements of the same class, delegates to . @since 0.5.0 @mc * */
+    compareTo(other: RenderElement3D): number;
+    /** Orders two elements of this exact class; implementations compare their own geometry and ignore colours and render flags. @since 0.5.0 @mc * */
+    compareToSame(other: unknown): number;
 }
 
 /** A salmon: size variant. */
@@ -2590,18 +5426,99 @@ interface SalmonEntity extends AbstractSchoolingFishEntity {
     readonly variant: string;
 }
 
+/** Short-lived drawing context handed to a screen's onRender callback: four immediate-mode primitives (text/rect/outline/sprite) straight onto the frame's neutral , drawn above the widgets. The canvas exists only for the duration of one callback — use after it returns throws — and exposes no OpenGL or pipeline types to scripts. Colors are ARGB numbers; sprite ids are namespace:path. */
+interface ScreenCanvas {
+    /** Draws a 1-pixel rectangle outline. @since 0.5.0 @mc * */
+    outline(x: number, y: number, width: number, height: number, color: number): void;
+    /** Fills a rectangle (x, y, width, height) with an ARGB color. @since 0.5.0 @mc * */
+    rect(x: number, y: number, width: number, height: number, color: number): void;
+    /** Draws a texture scaled to the rectangle (namespace:path). @since 0.5.0 @mc * */
+    sprite(x: number, y: number, width: number, height: number, textureId: string): void;
+    /** Draws a text string at (x, y) in white. @since 0.5.0 @mc * */
+    text(x: number, y: number, text: string): void;
+    /** Draws a text string at (x, y) with an ARGB color. @since 0.5.0 @mc * */
+    text(x: number, y: number, text: string, color: number): void;
+}
+
+/** Declarative configuration for one script-built screen: title, lifecycle flags, the ordered flat control list, and the seven screen-level callback fields. Scripts pass a plain object literal to player.buildScreen; the facade parses it into this record, keeps the callbacks, and hands the adapter a callback-free neutral map. Defaults follow the G-003 decisions: showTitle=true, pause=false (a pausing screen would stall single-player ticks and the e2e harness), closeOnEsc=true, returnTo='current'. */
+interface ScreenSpec {
+    /** closeOnEsc @since 0.5.0 @mc * */
+    readonly closeOnEsc: boolean;
+    /** controls @since 0.5.0 @mc * */
+    readonly controls: ControlSpec[];
+    /** onCharTyped @since 0.5.0 @mc * */
+    readonly onCharTyped: (e: {char: string}) => boolean;
+    /** onClose @since 0.5.0 @mc * */
+    readonly onClose: () => void;
+    /** onKeyPress @since 0.5.0 @mc * */
+    readonly onKeyPress: (e: {key: string, code: number, modifiers: string[]}) => boolean;
+    /** onMouseDown @since 0.5.0 @mc * */
+    readonly onMouseDown: (e: {pos: Pos2D, button: number, modifiers: string[], delta?: {x: number, y: number}, doubleClick?: boolean}) => boolean;
+    /** onMouseDrag @since 0.5.0 @mc * */
+    readonly onMouseDrag: (e: {pos: Pos2D, button: number, modifiers: string[], delta: {x: number, y: number}}) => boolean;
+    /** onMouseUp @since 0.5.0 @mc * */
+    readonly onMouseUp: (e: {pos: Pos2D, button: number, modifiers: string[], doubleClick?: boolean}) => boolean;
+    /** onRender @since 0.5.0 @mc * */
+    readonly onRender: (e: {ctx: ScreenCanvas, mouse: {x: number, y: number}, partialTick: number}) => void;
+    /** pause @since 0.5.0 @mc * */
+    readonly pause: boolean;
+    /** returnTo @since 0.5.0 @mc * */
+    readonly returnTo: string;
+    /** showTitle @since 0.5.0 @mc * */
+    readonly showTitle: boolean;
+    /** title @since 0.5.0 @mc * */
+    readonly title: string;
+}
+
 /** A sheep: wool color and sheared state. */
 interface SheepEntity extends AnimalEntity {
     /** The wool color identifier, e.g. minecraft:white. @since 0.2.0 @mc * */
     readonly color: string;
+    /** Whether the sheep is a rainbow "jeb_" sheep (name-driven). @since 0.5.0 @mc * */
+    readonly jeb: boolean;
+    /** Whether the sheep is currently shearable (grown wool, not a baby). @since 0.5.0 @mc * */
+    readonly shearable: boolean;
     /** Whether the wool has been sheared off. @since 0.2.0 @mc * */
     readonly sheared: boolean;
 }
 
 /** A shulker: shell color. */
 interface ShulkerEntity extends MobEntity {
+    /** The face direction the shulker is attached to (e.g. north). @since 0.5.0 @mc * */
+    readonly attachFace: string;
     /** The shell color identifier, or undefined for the default shell. @since 0.2.0 @mc * */
     readonly color: string;
+    /** The current shell opening amount from 0 (closed) to 1. @since 0.5.0 @mc * */
+    readonly peek: number;
+}
+
+/** Live handle for a slider control. value is the normalized 0..1 position; steps is the discrete snapping count (0 = continuous). Writes land on the live widget in place — setValue without an event echo, setSteps re-snaps the current value and refreshes the label. */
+interface Slider extends Widget {
+    /** The discrete step count, 0 for continuous (getSteps). @since 0.5.0 @mc * */
+    steps: number;
+    /** The normalized 0..1 value (getValue). @since 0.5.0 @mc * */
+    value: number;
+    /** Sets the discrete step count and returns this handle. @since 0.5.0 @mc * */
+    setSteps(steps: number): Slider;
+    /** Sets the normalized value (clamped to 0..1) and returns this handle. @since 0.5.0 @mc * */
+    setValue(value: number): Slider;
+}
+
+/** Builder for slider controls: steps(n) sets the discrete snapping count (0 = continuous), initially(v) seeds the normalized 0..1 value, action maps to . Builder-side getSteps/getValue readbacks are compat-held with their capability on build().steps/build().value. Unit note (compat write-back): NeoMacros slider values are the normalized 0..1 doubles of ControlSpec.value (the G-035 addSlider unit). If the compat layer measures in step units it converts before delegating (G-003 §13 behavior write-back). */
+interface SliderBuilder extends AbstractWidgetBuilder {
+    construct(args: Array<unknown>): unknown;
+    /** Seeds the normalized 0..1 initial value (initially). @since 0.5.0 @mc * */
+    initially(value: number): SliderBuilder;
+    /** Registers the value-change callback (action → onChange). @since 0.5.0 @mc * */
+    onChange(handler: (e: {id: string, type: string, value?: number}) => void): SliderBuilder;
+    /** Sets the discrete step count (0 = continuous). @since 0.5.0 @mc * */
+    steps(steps: number): SliderBuilder;
+}
+
+/** A slime (or magma cube): its size tier. */
+interface SlimeEntity extends MobEntity {
+    /** The size tier (1 for small, up to the natural maximum of 4). @since 0.5.0 @mc * */
+    readonly size: number;
 }
 
 /** A sniffer: sniffing and digging state. */
@@ -2616,8 +5533,16 @@ interface SnifferEntity extends AnimalEntity {
 
 /** A snow golem: pumpkin hat state. */
 interface SnowGolemEntity extends MobEntity {
+    /** Whether the snow golem is currently shearable. @since 0.5.0 @mc * */
+    readonly shearable: boolean;
     /** Whether the pumpkin hat is still on. @since 0.2.0 @mc * */
     hasPumpkin(): boolean;
+}
+
+/** A spellcasting illager: spell casting state. */
+interface SpellcasterIllagerEntity extends AbstractIllagerEntity {
+    /** Whether a spell is currently being cast. @since 0.5.0 @mc * */
+    readonly castingSpell: boolean;
 }
 
 /** A spider: wall-climbing state. */
@@ -2628,6 +5553,10 @@ interface SpiderEntity extends MobEntity {
 
 /** A strider: saddle and shivering state. */
 interface StriderEntity extends MobEntity {
+    /** Whether a saddle is currently equipped. @since 0.5.0 @mc * */
+    readonly saddled: boolean;
+    /** Whether the strider is shivering outside the lava it needs. @since 0.5.0 @mc * */
+    readonly shivering: boolean;
 }
 
 /** Handle of one event subscription; returned to scripts by events.on / once / onSync. Unsubscribing through the handle removes the subscription from dispatch; module dispose iterates its handles the same way. */
@@ -2644,20 +5573,208 @@ interface Subscription {
     unsubscribe(): void;
 }
 
+/** The completion builder handed to a slot's suggests callback while the player tabs through a command. It reads as a flat handle: input is the command line typed so far, start is the offset of the token being completed, and remaining is the unfinished tail from that offset. The suggest* methods queue completions for that token and return the same builder for chaining; queued entries reach the game's suggestion list when the callback returns. This is the single completion surface of command.register; no parallel builder grows here. */
+interface SuggestionsBuilder {
+    /** The command line typed so far (truncated at the cursor). @since 0.5.0 @mc * */
+    readonly input: string;
+    /** The unfinished text from to the cursor. @since 0.5.0 @mc * */
+    readonly remaining: string;
+    /** lowercased, for prefix matching. @since 0.5.0 @mc * */
+    readonly remainingLowerCase: string;
+    /** The character offset in where the token being completed starts. @since 0.5.0 @mc * */
+    readonly start: number;
+    /** Offers one completion: a string, or a number rendered in decimal. A value identical to the remaining text is dropped, matching the game's own suggestion filter. @since 0.5.0 @mc * */
+    suggest(value: string | number): SuggestionsBuilder;
+    /** Offers block positions as x y z coordinate strings. @since 0.5.0 @mc * */
+    suggestBlockPositions(positions: Array<BlockPos>): SuggestionsBuilder;
+    /** Offers every registry identifier that starts with the text being completed; entries that are not resource-location shaped are skipped instead of failing the batch. @since 0.5.0 @mc * */
+    suggestIdentifier(values: string[]): SuggestionsBuilder;
+    /** Offers every candidate that starts with the text being completed. @since 0.5.0 @mc * */
+    suggestMatching(values: string[]): SuggestionsBuilder;
+    /** Offers coordinate strings, each with two or three whitespace-separated components and a common component count across the call. Candidates are filtered against the text being completed, so a partially typed coordinate keeps matching. @since 0.5.0 @mc * */
+    suggestPositions(positions: string[]): SuggestionsBuilder;
+    /** Offers one completion with a tooltip shown beside it. @since 0.5.0 @mc * */
+    suggestWithTooltip(value: string | number, tooltip: TextComponent): SuggestionsBuilder;
+}
+
+/** A flat rectangular panel placed in the world — a 2D overlay living in three dimensions. Its size is in blocks; and report surface pixels (the smaller side carries pixels, the other side scales with the aspect ratio). The renderer re-derives the panel's four corners every frame from its position, size and rotations (applied y, then x, then z, in degrees), so live mutations re-project immediately. Three settings decide whether it can be seen: cull depth- tests it against terrain (off draws it over the world), renderBack draws the far side (off hides the panel from behind), and rotateToPlayer overwrites the rotations each frame with a camera-facing billboard. makes the panel follow an entity's position plus . Lighting defaults to full brightness; and record world/fixed levels (the current pipelines draw flat colour). This class is both element and builder (G-001 拍板②): take one from or , configure with the fluent setters, then to attach it. defaults: 10 × 10 blocks, centred rotation, rendered back, no depth culling, full-bright, one subdivision across the smaller side; the addDraw2D quick forms default to a 1 × 1 panel, no rotation, corner pivot, 200 subdivisions, no back face and no depth culling. */
+interface Surface extends RenderElement3D {
+    /** The followed entity, or null while unbound. @since 0.5.0 @mc * */
+    boundEntity: Entity;
+    /** The entity-following offset as a point copy. @since 0.5.0 @mc * */
+    boundOffset: Pos3D;
+    /** Whether the panel is depth tested; false draws it over the world. @since 0.5.0 @mc * */
+    culled: boolean;
+    /** The surface height in pixels, scaled like . @since 0.5.0 @mc * */
+    height: number;
+    /** The subdivision count across this surface's smaller side. @since 0.5.0 @mc * */
+    minSubdivisions: number;
+    /** The world position as a point copy (the panel corner, or its centre while rotateCenter is on). @since 0.5.0 @mc * */
+    pos: Pos3D;
+    /** Whether rotations pivot around the centre rather than the corner. @since 0.5.0 @mc * */
+    rotatingCenter: boolean;
+    /** The rotations in degrees as a point copy (x, y, z). @since 0.5.0 @mc * */
+    rotations: Pos3D;
+    /** The physical width and height in blocks as a copy; writing to it does not resize the surface — use . @since 0.5.0 @mc * */
+    sizes: Pos2D;
+    /** The surface width in pixels: the smaller side carries pixels and the other side scales with the surface's aspect ratio, truncated to an integer. @since 0.5.0 @mc * */
+    width: number;
+    /** The x rotation in degrees. @since 0.5.0 @mc * */
+    xRotation: number;
+    /** The y rotation in degrees. @since 0.5.0 @mc * */
+    yRotation: number;
+    /** Surfaces do not use a z-index for ordering; always 0. @since 0.5.0 @mc * */
+    zIndex: number;
+    /** The blocks-per-z-index-unit scale. @since 0.5.0 @mc * */
+    zIndexScale: number;
+    /** The z rotation in degrees. @since 0.5.0 @mc * */
+    zRotation: number;
+    /** Binds this surface to an entity: while the entity is alive, its position plus determines the render position. Passing null unbinds it. @since 0.5.0 @mc * */
+    bindToEntity(boundEntity: Entity): Surface;
+    /** Returns this surface without attaching it to an overlay. @since 0.5.0 @mc * */
+    build(): Surface;
+    /** Attaches this surface to the overlay its builder came from and returns it. @since 0.5.0 @mc * */
+    buildAndAdd(): Surface;
+    /** Orders surfaces by position, then rotations, then size; surfaces matching on all three compare equal (values, not spatial distance). @since 0.5.0 @mc * */
+    compareToSame(other: Surface): number;
+    /** Enables depth testing (terrain can hide the panel) or draws it over the world; defaults to false. @since 0.5.0 @mc * */
+    cull(cull: boolean): Surface;
+    /** Whether the surface faces the camera during rendering. @since 0.5.0 @mc * */
+    doesRotateToPlayer(): boolean;
+    /** Controls whether the back of the panel is drawn; with it off the surface disappears when the camera is behind it. @since 0.5.0 @mc * */
+    renderBack(renderBack: boolean): Surface;
+    /** Sets the offset added to the bound entity's position, in blocks; it has no effect while the surface is unbound. Coordinates are copied. @since 0.5.0 @mc * */
+    setBoundOffset(boundOffset: Pos3D): Surface;
+    /** Makes everything on this surface render at full brightness, ignoring world lighting (the default). @since 0.5.0 @mc * */
+    setFullBrightLight(): Surface;
+    /** Sets the physical height in blocks, keeping the width. @since 0.5.0 @mc * */
+    setHeight(height: number): Surface;
+    /** Sets fixed block and sky light levels for this surface. @since 0.5.0 @mc * */
+    setLight(blockLight: number, skyLight: number): Surface;
+    /** Sets the number of subdivisions across the smaller side; values of 0 or below are raised to 1. @since 0.5.0 @mc * */
+    setMinSubdivisions(minSubdivisions: number): Surface;
+    /** Moves this surface to pos's coordinates: the panel's top-left corner, or its centre while is on. Coordinates are copied; later changes to pos do not move it. @since 0.5.0 @mc * */
+    setPos(pos: Pos3D): Surface;
+    /** Selects the rotation pivot (and what pos means): the panel's corner while off, its centre while on. @since 0.5.0 @mc * */
+    setRotateCenter(rotateCenter: boolean): Surface;
+    /** Sets whether the surface is rotated to face the camera every frame, overwriting the configured rotations while enabled. @since 0.5.0 @mc * */
+    setRotateToPlayer(rotateToPlayer: boolean): Surface;
+    /** Sets the surface's rotations in degrees, applied in the order y, then x, then z (y swings the panel around to a compass direction, the other two tilt it). @since 0.5.0 @mc * */
+    setRotations(x: number, y: number, z: number): Surface;
+    /** Sets the physical width and height in blocks (not pixel room — the pixels are subdivisions of this size). @since 0.5.0 @mc * */
+    setSizes(width: number, height: number): Surface;
+    /** Sets the physical width in blocks, keeping the height. @since 0.5.0 @mc * */
+    setWidth(width: number): Surface;
+    /** Makes the surface use the block and sky light at its render position, sampled each frame. @since 0.5.0 @mc * */
+    setWorldLight(): Surface;
+    /** Sets the x rotation in degrees. @since 0.5.0 @mc * */
+    setXRotation(xRot: number): Surface;
+    /** Sets the y rotation in degrees. @since 0.5.0 @mc * */
+    setYRotation(yRot: number): Surface;
+    /** Scales each element's z-index into a rendering offset in blocks; defaults to 0.001 blocks per z-index unit. @since 0.5.0 @mc * */
+    setZIndexScale(zIndexScale: number): Surface;
+    /** Sets the z rotation in degrees. @since 0.5.0 @mc * */
+    setZRotation(zRot: number): Surface;
+    /** Whether the back of the panel is drawn as well as its front. @since 0.5.0 @mc * */
+    shouldRenderBack(): boolean;
+}
+
 /** The tameable base (wolves, cats): ownership and sitting state land here with the tameable gap batch. */
 interface TamableAnimalEntity extends AnimalEntity {
+    /** The owning player handle, or undefined when untamed or absent. @since 0.5.0 @mc * */
+    readonly owner: Entity;
+    /** Whether the animal is sitting (ordered to stay). @since 0.5.0 @mc * */
+    readonly sitting: boolean;
+    /** Whether the animal has been tamed. @since 0.5.0 @mc * */
+    readonly tamed: boolean;
 }
 
 /** Immutable styled text node: literal content plus optional color, decorations, hover content, click action, and nested children. Built with (build()); instances also arrive as the chat:receive payload. JSON.stringify renders the vanilla component tree ({text, color, …, extra: [...]}). */
 interface TextComponent {
     /** The nested child nodes in order. @since 0.4.0 @mc * */
     readonly children: Array<TextComponent>;
+    /** The click action target set on this node (undefined when this node has no click action). The action name itself is implied by the builder call that set it. @since 0.5.0 @mc * */
+    readonly clickValue: string;
+    /** The color set on this node: a vanilla formatting name or #rrggbb; undefined when this node leaves the color to its parent. Read on this node alone — children resolve inheritance when the tree is rendered. @since 0.5.0 @mc * */
+    readonly color: string;
     /** The literal content of this node. @since 0.4.0 @mc * */
     readonly content: string;
+    /** The hover action set on this node: show_text, show_item, or show_entity; undefined when this node has no hover. @since 0.5.0 @mc * */
+    readonly hoverAction: string;
+    /** The hover value set on this node, shaped by : a for show-text, an for show-item, an entity handle for show-entity; undefined when this node has no hover. @since 0.5.0 @mc * */
+    readonly hoverValue: TextComponent | ItemStack | Entity | undefined;
     /** The plain concatenated text of the whole tree. @since 0.4.0 @mc * */
     readonly plain: string;
     /** Vanilla component tree rendering used by JSON.stringify; unset styling keys are omitted. @since 0.4.0 @mc * */
     toJSON(): string;
+}
+
+/** A text display: the rendered text and background. */
+interface TextDisplayEntity extends DisplayEntity {
+    /** The text alignment (left, center or right); left wins when both alignment bits are set. @since 0.5.0 @mc * */
+    readonly alignment: string;
+    /** The background color as packed ARGB. @since 0.5.0 @mc * */
+    readonly backgroundColor: number;
+    /** The maximum line width in font pixels before wrapping (the vanilla default is 200). @since 0.5.0 @mc * */
+    readonly lineWidth: number;
+    /** The rendered plain text. @since 0.5.0 @mc * */
+    readonly text: string;
+    /** The text opacity: 0 transparent, 255 opaque, -1 the opaque default; affects the text, not the background. @since 0.5.0 @mc * */
+    readonly textOpacity: number;
+    /** Whether the default background box is used. @since 0.5.0 @mc * */
+    hasDefaultBackground(): boolean;
+    /** Whether text and background use the see-through rendering mode. @since 0.5.0 @mc * */
+    hasSeeThrough(): boolean;
+    /** Whether the text is drawn with a drop shadow. @since 0.5.0 @mc * */
+    hasShadow(): boolean;
+}
+
+/** Builder for editBox controls (NeoMacros keeps the task-card word while the live handle uses the Mojang word ): suggestion(s) seeds the placeholder, action maps to ; the builder-side getSuggestion readback is compat-held with its capability on build().suggestion. */
+interface TextFieldBuilder extends AbstractWidgetBuilder {
+    construct(args: Array<unknown>): unknown;
+    /** Registers the text-change callback (action → onChange). @since 0.5.0 @mc * */
+    onChange(handler: (e: {id: string, type: string, text?: string}) => void): TextFieldBuilder;
+    /** Seeds the placeholder suggestion shown when the box is empty. @since 0.5.0 @mc * */
+    suggestion(suggestion: string): TextFieldBuilder;
+}
+
+/** A registered texture slot handed out by hud.texture(name, spec?): the script-visible half of the minimal texture registry (G-001 拍板⑥). The handle owns the GPU slot under neomacros:image/<name> — is the identifier layer.image's texture field consumes — plus its lifecycle: re-uploads pixels from a PNG snapshot, unregisters the entry and releases the GPU texture. Registration is namespaced per module owner; unloading the module disposes every texture it registered. Textures with the same name under one owner are one entry: repeated hud.texture(name) calls return the same live handle. The identifier itself is global by name, and it is shared with canvases of the same name. Example: const badge = neo.hud.texture('badge', {width: 64, height: 64}); await badge.update(someImage); layer.image('shot', {texture: badge.id, x: 0, y: 0, w: 64, h: 64}); badge.dispose(); */
+interface Texture {
+    /** Whether this handle has been disposed (explicitly or by module unload); disposed handles stay readable but reject . @since 0.5.0 @mc * */
+    readonly disposed: boolean;
+    /** The texture height in pixels: the registered size, refreshed to the last upload. @since 0.5.0 @mc * */
+    readonly height: number;
+    /** The registered texture identifier; layer.image's texture field consumes this value directly. Images with the same name share the identifier. @since 0.5.0 @mc * */
+    readonly id: string;
+    /** The registry name, without the neomacros:image/ prefix. @since 0.5.0 @mc * */
+    readonly name: string;
+    /** The texture width in pixels: the registered size, refreshed to the last upload. @since 0.5.0 @mc * */
+    readonly width: number;
+    /** Unregisters this texture: the entry leaves the registry and the GPU texture under is released (unknown ids are ignored by the port). Idempotent — disposing twice has no further effect. The identifier is global by name, so disposal also releases a same-named canvas's GPU slot; that canvas re-registers itself on its next update(). @since 0.5.0 @mc * */
+    dispose(): void;
+    /** Uploads a PNG snapshot (e.g. a CustomImage's image) as this texture's pixels; the full texture is re-uploaded on the game main thread and / refresh to the snapshot's dimensions. Decoding and argument errors throw synchronously; upload failures reject the promise. @since 0.5.0 @mc * */
+    update(image: Image): Promise<Texture>;
+}
+
+/** Builder for imageButton controls: the four sprite slots of the vanilla WidgetSprites quadruple as plain string ids — the ResourceLocation/String overload pairs collapse into one string form per slot (G-003 §5.2 signature merge 2→1). All four must be set before (the quadruple is validated as a whole). */
+interface TexturedButtonBuilder extends AbstractWidgetBuilder {
+    construct(args: Array<unknown>): unknown;
+    /** Sets the focused-disabled texture id (disabledFocusedTexture). @since 0.5.0 @mc * */
+    disabledFocusedTexture(disabledFocused: string): TexturedButtonBuilder;
+    /** Sets the disabled-state texture id (disabledTexture). @since 0.5.0 @mc * */
+    disabledTexture(disabled: string): TexturedButtonBuilder;
+    /** Sets the focused-enabled texture id (enabledFocusedTexture). @since 0.5.0 @mc * */
+    enabledFocusedTexture(enabledFocused: string): TexturedButtonBuilder;
+    /** Sets the enabled-state texture id (enabledTexture). @since 0.5.0 @mc * */
+    enabledTexture(enabled: string): TexturedButtonBuilder;
+    /** Registers the press callback (action → onClick). @since 0.5.0 @mc * */
+    onClick(handler: (e: {id: string, type: string}) => void): TexturedButtonBuilder;
+}
+
+/** A thrown trident: enchantment foil state. */
+interface ThrownTridentEntity extends AbstractArrowEntity {
+    /** Whether the trident renders with enchantment foil. @since 0.5.0 @mc * */
+    readonly foil: boolean;
 }
 
 /** Handle of one pending or repeating timer created through the thread module; cancelling stops the schedule (idempotent). */
@@ -2668,6 +5785,32 @@ interface TimerHandle {
     cancel(): void;
 }
 
+/** A line from the camera toward a script-selected world-space target. The renderer updates the camera-side endpoint every frame; and refer to the target endpoint only. Like this class is both element and builder (G-001 拍板②): take one from , configure it with the fluent setters, then to attach it. Defaults: opaque white target, drawn over terrain (alwaysOnTop enabled, i.e. cull == false). Packed colour parameters accept the full-range JS literals (0xFF00FF00) through a Java-side long. */
+interface TraceLine extends RenderElement3D {
+    /** The line alpha. @since 0.5.0 @mc * */
+    alpha: number;
+    /** Whether the line is drawn over the world regardless of depth. @since 0.5.0 @mc * */
+    alwaysOnTop: boolean;
+    /** The line colour's low 24 bits; read alpha separately with . @since 0.5.0 @mc * */
+    color: number;
+    /** The target endpoint as a point copy. @since 0.5.0 @mc * */
+    pos: Pos3D;
+    /** Returns this trace line without attaching it to an overlay. @since 0.5.0 @mc * */
+    build(): TraceLine;
+    /** Attaches this trace line to the overlay its builder came from and returns it. @since 0.5.0 @mc * */
+    buildAndAdd(): TraceLine;
+    /** Orders trace lines by their target endpoint's coordinates; colour and depth testing are ignored. @since 0.5.0 @mc * */
+    compareToSame(other: TraceLine): number;
+    /** Replaces the alpha without changing the RGB bits. @since 0.5.0 @mc * */
+    setAlpha(alpha: number): TraceLine;
+    /** Sets whether depth testing is disabled (true, draws over terrain) or enabled (false); defaults to true. @since 0.5.0 @mc * */
+    setAlwaysOnTop(alwaysOnTop: boolean): TraceLine;
+    /** Sets the packed colour; a non-zero RGB value with a zero alpha byte becomes opaque, transparent black stays transparent. @since 0.5.0 @mc * */
+    setColor(color: number, alpha?: number): TraceLine;
+    /** Sets the target endpoint from the coordinates in pos; later changes to pos do not move the line (coordinates are copied). @since 0.5.0 @mc * */
+    setPos(pos: Pos3D): TraceLine;
+}
+
 /** A tropical fish: shape pattern and colors. */
 interface TropicalFishEntity extends AbstractFishEntity {
     /** The base body color identifier, e.g. minecraft:white. @since 0.2.0 @mc * */
@@ -2676,10 +5819,16 @@ interface TropicalFishEntity extends AbstractFishEntity {
     readonly pattern: string;
     /** The pattern highlight color identifier, e.g. minecraft:blue. @since 0.2.0 @mc * */
     readonly patternColor: string;
+    /** The body size carried by the pattern, small or large. @since 0.5.0 @mc * */
+    readonly size: string;
+    /** The packed variant integer encoding pattern and both colors. @since 0.5.0 @mc * */
+    readonly varietyId: number;
 }
 
 /** A turtle: egg-laying state. */
 interface TurtleEntity extends AnimalEntity {
+    /** The home beach position the turtle returns to (x, y, z). @since 0.5.0 @mc * */
+    readonly homePos: unknown;
     /** Whether the turtle is carrying eggs. @since 0.2.0 @mc * */
     hasEgg(): boolean;
 }
@@ -2700,6 +5849,10 @@ interface VillagerEntity extends MobEntity {
     readonly variant: string;
 }
 
+/** A vindicator (the johnny flag has no client accessor). */
+interface VindicatorEntity extends AbstractIllagerEntity {
+}
+
 /** A wandering trader: despawn countdown. */
 interface WanderingTraderEntity extends MobEntity {
     /** The delay in ticks before the trader despawns; zero while trading. @since 0.2.0 @mc * */
@@ -2712,8 +5865,62 @@ interface WardenEntity extends MobEntity {
     readonly angerLevel: string;
 }
 
+/** Live handle for one control on an open — the shared face of the widget family (ClickableWidgetHelper account, G-036B). Binds one control id to its owning session: reads answer the session cache, writes go through onto the live widget. The generic parameter is the concrete handle type, so fluent calls chain back to the subclass (gui.slider(id).setPos(x, y).setValue(v)). Tooltips live on the session (shared across handle queries) and are mirrored into the adapter so rebuilds keep them; click is a transient press+release at the widget's top-left corner. Layout reads (scaled*) answer the widget box, parent* the host window's scaled size — the full-window screen extent. After the session closes, reads answer neutral defaults and every mutation throws through setControl. */
+interface Widget {
+    /** Whether the widget accepts input (getActive). @since 0.5.0 @mc * */
+    active: boolean;
+    /** The widget height in pixels (getHeight). @since 0.5.0 @mc * */
+    height: number;
+    /** The control id this handle is bound to. @since 0.5.0 @mc * */
+    id: string;
+    /** The label text (getLabel, Mojang message). @since 0.5.0 @mc * */
+    message: string;
+    /** The host window height for parent-relative alignment (getParentHeight). @since 0.5.0 @mc * */
+    parentHeight: number;
+    /** The host window width for parent-relative alignment (getParentWidth). @since 0.5.0 @mc * */
+    parentWidth: number;
+    /** The widget height alignment reads (getScaledHeight). @since 0.5.0 @mc * */
+    scaledHeight: number;
+    /** The left edge alignment reads (getScaledLeft). @since 0.5.0 @mc * */
+    scaledLeft: number;
+    /** The top edge alignment reads (getScaledTop). @since 0.5.0 @mc * */
+    scaledTop: number;
+    /** The widget width alignment reads (getScaledWidth; no scaling on screens). @since 0.5.0 @mc * */
+    scaledWidth: number;
+    /** The owning session handle. @since 0.5.0 @mc * */
+    screen: BuiltScreen;
+    /** The tooltip lines in insertion order (getTooltips). @since 0.5.0 @mc * */
+    tooltips: Array<string>;
+    /** The widget width in pixels (getWidth). @since 0.5.0 @mc * */
+    width: number;
+    /** The widget's left edge in screen pixels (getX). @since 0.5.0 @mc * */
+    x: number;
+    /** The widget's top edge in screen pixels (getY). @since 0.5.0 @mc * */
+    y: number;
+    /** The draw/hit ordering key (getZIndex). @since 0.5.0 @mc * */
+    zIndex: number;
+    /** Appends one tooltip, keeping insertion order (addTooltip). @since 0.5.0 @mc * */
+    addTooltip(tooltip: any): unknown;
+    /** Sends a left-button press and release at the widget's top-left corner (click): the port runs it on the game main thread, so the call always completes the press before returning (the await flag has no effect and is not exposed). Inactive widgets swallow the press, exactly as a real click does. @since 0.5.0 @mc * */
+    click(): unknown;
+    /** Moves the widget to a new position (moveTo, the alignment helper). @since 0.5.0 @mc * */
+    moveTo(x: number, y: number): unknown;
+    /** Removes one tooltip by index or by text (removeTooltip): a number removes at that zero-based index, anything else removes the first entry whose text equals toString(). Answers false when nothing matched. @since 0.5.0 @mc * */
+    removeTooltip(target: number | any): boolean;
+    /** Enables/disables input and returns this handle (setActive). @since 0.5.0 @mc * */
+    setActive(active: boolean): unknown;
+    /** Sets the label and returns this handle (setLabel → setMessage). @since 0.5.0 @mc * */
+    setMessage(message: string): unknown;
+    /** Moves the widget without resizing it (setPos). @since 0.5.0 @mc * */
+    setPos(x: number, y: number): unknown;
+    /** Replaces the tooltip list (setTooltip). Accepts one value or a list of values; every entry is rendered as plain text (toString), lines join into one multi-line tooltip. @since 0.5.0 @mc * */
+    setTooltip(tooltips: any | any[]): unknown;
+    /** Sets the width, keeping the height (setWidth). @since 0.5.0 @mc * */
+    setWidth(width: number): unknown;
+}
+
 /** A witch: potion-drinking state. */
-interface WitchEntity extends MobEntity {
+interface WitchEntity extends AbstractIllagerEntity {
     /** Whether the witch is drinking a potion. @since 0.2.0 @mc * */
     readonly drinkingPotion: boolean;
 }
@@ -2722,12 +5929,28 @@ interface WitchEntity extends MobEntity {
 interface WitherBossEntity extends MobEntity {
     /** The remaining invulnerability armor ticks (0 after the entry phase). @since 0.2.0 @mc * */
     readonly invulnerableTicks: number;
+    /** Whether the wither is in its powered (half-health) phase. @since 0.5.0 @mc * */
+    readonly powered: boolean;
+}
+
+/** A wither skull: charged (blue) state. */
+interface WitherSkullEntity extends ProjectileEntity {
+    /** Whether this is the charged blue skull variant. @since 0.5.0 @mc * */
+    readonly charged: boolean;
 }
 
 /** A wolf: collar color. Anger and begging state ride the tameable gap batch (the vanilla accessors moved behind the wolf AI profile). */
 interface WolfEntity extends TamableAnimalEntity {
+    /** Whether the wolf is currently angry at a player. @since 0.5.0 @mc * */
+    readonly angry: boolean;
+    /** The worn wolf armor item identifier, or undefined when bare. @since 0.5.0 @mc * */
+    readonly armor: string;
+    /** Whether the wolf is begging (its interested flag, set while a player nearby holds something it wants). @since 0.5.0 @mc * */
+    readonly begging: boolean;
     /** The collar color identifier, e.g. minecraft:red. @since 0.2.0 @mc * */
     readonly collarColor: string;
+    /** Whether the wolf is shaking water off (wet state). @since 0.5.0 @mc * */
+    readonly wet: boolean;
 }
 
 /** A zombie: drowning conversion state. */
@@ -2752,9 +5975,17 @@ interface ZombieVillagerEntity extends ZombieEntity {
 interface ZombifiedPiglinEntity extends ZombieEntity {
 }
 
-interface EnchantmentData {
-    id: string;
-    level: number;
+interface ClipBounds {
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+}
+
+interface FoodData {
+    alwaysEdible: boolean;
+    hunger: number;
+    saturation: number;
 }
 
 /** The script-visible root namespace: module facades and root classes. */
@@ -2770,16 +6001,25 @@ interface NeoRoot {
     java: JavaApi;
     net: NetApi;
     performance: PerformanceApi;
+    permission: PermissionApi;
     player: PlayerApi;
     reflect: ReflectApi;
     render: RenderApi;
     storage: StorageApi;
     thread: ThreadApi;
     world: WorldApi;
+    AccessibilityOptions: Function & { readonly prototype: AccessibilityOptions; };
+    ChatOptions: Function & { readonly prototype: ChatOptions; };
+    ControlOptions: Function & { readonly prototype: ControlOptions; };
     MousePos: Function & { readonly prototype: MousePos; };
+    MusicOptions: Function & { readonly prototype: MusicOptions; };
+    Options: Function & { readonly prototype: Options; };
+    SkinOptions: Function & { readonly prototype: SkinOptions; };
+    VideoOptions: Function & { readonly prototype: VideoOptions; };
     CommandSpec: Function & { readonly prototype: CommandSpec; };
     BoundingBox: Function & { readonly prototype: BoundingBox; };
     Entity: Function & { readonly prototype: Entity; };
+    EntityInBoxOptions: Function & { readonly prototype: EntityInBoxOptions; };
     ItemEntity: Function & { readonly prototype: ItemEntity; };
     LivingEntity: Function & { readonly prototype: LivingEntity; };
     StatusEffectData: Function & { readonly prototype: StatusEffectData; };
@@ -2798,6 +6038,7 @@ interface NeoRoot {
     BeaconInventory: Function & { readonly prototype: BeaconInventory; };
     BookEditScreen: Function & { readonly prototype: BookEditScreen; };
     BookViewScreen: Function & { readonly prototype: BookViewScreen; };
+    BreakBlockResult: Function & { readonly prototype: BreakBlockResult; };
     BrewingStandInventory: Function & { readonly prototype: BrewingStandInventory; };
     CartographyInventory: Function & { readonly prototype: CartographyInventory; };
     ChatScreen: Function & { readonly prototype: ChatScreen; };
@@ -2806,6 +6047,7 @@ interface NeoRoot {
     ContainerInventory: Function & { readonly prototype: ContainerInventory; };
     ContainerScreen: Function & { readonly prototype: ContainerScreen; };
     CraftingInventory: Function & { readonly prototype: CraftingInventory; };
+    CreativeInventory: Function & { readonly prototype: CreativeInventory; };
     CreativeScreen: Function & { readonly prototype: CreativeScreen; };
     DeathScreen: Function & { readonly prototype: DeathScreen; };
     DialogAction: Function & { readonly prototype: DialogAction; };
@@ -2819,14 +6061,18 @@ interface NeoRoot {
     FurnaceInventory: Function & { readonly prototype: FurnaceInventory; };
     GrindstoneInventory: Function & { readonly prototype: GrindstoneInventory; };
     HorseInventory: Function & { readonly prototype: HorseInventory; };
+    Interactions: Function & { readonly prototype: Interactions; };
     Inventory: Function & { readonly prototype: Inventory; };
     InventoryScreen: Function & { readonly prototype: InventoryScreen; };
     JigsawScreen: Function & { readonly prototype: JigsawScreen; };
     LocalPlayer: Function & { readonly prototype: LocalPlayer; };
+    LoomInventory: Function & { readonly prototype: LoomInventory; };
     PauseScreen: Function & { readonly prototype: PauseScreen; };
     Player: Function & { readonly prototype: Player; };
     PlayerInventory: Function & { readonly prototype: PlayerInventory; };
     ProgressScreen: Function & { readonly prototype: ProgressScreen; };
+    Recipe: Function & { readonly prototype: Recipe; };
+    RecipeInventory: Function & { readonly prototype: RecipeInventory; };
     Screen: Function & { readonly prototype: Screen; };
     SignScreen: Function & { readonly prototype: SignScreen; };
     SmithingInventory: Function & { readonly prototype: SmithingInventory; };
@@ -2841,24 +6087,40 @@ interface NeoRoot {
     WinScreen: Function & { readonly prototype: WinScreen; };
     XpInfo: Function & { readonly prototype: XpInfo; };
     FindBlocksOptions: Function & { readonly prototype: FindBlocksOptions; };
+    ScanBlocksOptions: Function & { readonly prototype: ScanBlocksOptions; };
+    AbstractArrowEntity: Function & { readonly prototype: AbstractArrowEntity; };
     AbstractChestedHorseEntity: Function & { readonly prototype: AbstractChestedHorseEntity; };
     AbstractFishEntity: Function & { readonly prototype: AbstractFishEntity; };
     AbstractHorseEntity: Function & { readonly prototype: AbstractHorseEntity; };
+    AbstractIllagerEntity: Function & { readonly prototype: AbstractIllagerEntity; };
+    AbstractMinecartEntity: Function & { readonly prototype: AbstractMinecartEntity; };
     AbstractSchoolingFishEntity: Function & { readonly prototype: AbstractSchoolingFishEntity; };
+    AbstractWidgetBuilder: Function & { readonly prototype: AbstractWidgetBuilder; };
     AllayEntity: Function & { readonly prototype: AllayEntity; };
     AnimalEntity: Function & { readonly prototype: AnimalEntity; };
     AreaEffectCloudEntity: Function & { readonly prototype: AreaEffectCloudEntity; };
     ArmadilloEntity: Function & { readonly prototype: ArmadilloEntity; };
     ArmorStandEntity: Function & { readonly prototype: ArmorStandEntity; };
+    ArrowEntity: Function & { readonly prototype: ArrowEntity; };
     AxolotlEntity: Function & { readonly prototype: AxolotlEntity; };
     BatEntity: Function & { readonly prototype: BatEntity; };
     BeeEntity: Function & { readonly prototype: BeeEntity; };
     Block: Function & { readonly prototype: Block; };
+    BlockDisplayEntity: Function & { readonly prototype: BlockDisplayEntity; };
     BlockPos: { new(x: number, y: number, z: number): BlockPos; };
     BlockState: Function & { readonly prototype: BlockState; };
+    BoatEntity: Function & { readonly prototype: BoatEntity; };
+    Bounds: Function & { readonly prototype: Bounds; };
+    Box: Function & { readonly prototype: Box; };
     BreezeEntity: Function & { readonly prototype: BreezeEntity; };
+    BuiltScreen: Function & { readonly prototype: BuiltScreen; };
+    Button: Function & { readonly prototype: Button; };
+    ButtonBuilder: { new(): ButtonBuilder; };
     CamelEntity: Function & { readonly prototype: CamelEntity; };
     CatEntity: Function & { readonly prototype: CatEntity; };
+    CheckBoxBuilder: { new(): CheckBoxBuilder; };
+    Checkbox: Function & { readonly prototype: Checkbox; };
+    ChestBoatEntity: Function & { readonly prototype: ChestBoatEntity; };
     ChickenEntity: Function & { readonly prototype: ChickenEntity; };
     Chunk: Function & { readonly prototype: Chunk; };
     ChunkPos: { new(x: number, z: number): ChunkPos; };
@@ -2866,35 +6128,67 @@ interface NeoRoot {
     CommandArg: Function & { readonly prototype: CommandArg; };
     CommandContext: Function & { readonly prototype: CommandContext; };
     Component: { new(text: string): Component; };
+    ControlSpec: Function & { readonly prototype: ControlSpec; };
+    ControlState: Function & { readonly prototype: ControlState; };
     CowEntity: Function & { readonly prototype: CowEntity; };
     CreakingEntity: Function & { readonly prototype: CreakingEntity; };
     CreeperEntity: Function & { readonly prototype: CreeperEntity; };
+    CustomImage: { new(): CustomImage; };
+    CycleButton: Function & { readonly prototype: CycleButton; };
+    CyclicButtonBuilder: { new(): CyclicButtonBuilder; };
+    DisplayEntity: Function & { readonly prototype: DisplayEntity; };
     DolphinEntity: Function & { readonly prototype: DolphinEntity; };
     DonkeyEntity: Function & { readonly prototype: DonkeyEntity; };
+    Draw2DElement: Function & { readonly prototype: Draw2DElement; };
+    Draw2DImage: Function & { readonly prototype: Draw2DImage; };
+    Draw2DItem: Function & { readonly prototype: Draw2DItem; };
+    Draw2DLine: Function & { readonly prototype: Draw2DLine; };
+    Draw2DRect: Function & { readonly prototype: Draw2DRect; };
+    Draw2DText: Function & { readonly prototype: Draw2DText; };
+    Draw3D: Function & { readonly prototype: Draw3D; };
     DrownedEntity: Function & { readonly prototype: DrownedEntity; };
+    EditBox: Function & { readonly prototype: EditBox; };
+    Enchantment: Function & { readonly prototype: Enchantment; };
+    EndCrystalEntity: Function & { readonly prototype: EndCrystalEntity; };
     EnderDragonEntity: Function & { readonly prototype: EnderDragonEntity; };
     EndermanEntity: Function & { readonly prototype: EndermanEntity; };
+    EntityTraceLine: Function & { readonly prototype: EntityTraceLine; };
     EvokerEntity: Function & { readonly prototype: EvokerEntity; };
     FallingBlockEntity: Function & { readonly prototype: FallingBlockEntity; };
+    FishingHookEntity: Function & { readonly prototype: FishingHookEntity; };
     FoxEntity: Function & { readonly prototype: FoxEntity; };
     FrogEntity: Function & { readonly prototype: FrogEntity; };
     GhastEntity: Function & { readonly prototype: GhastEntity; };
     GoatEntity: Function & { readonly prototype: GoatEntity; };
+    GuardianEntity: Function & { readonly prototype: GuardianEntity; };
+    HangingEntity: Function & { readonly prototype: HangingEntity; };
     HorseEntity: Function & { readonly prototype: HorseEntity; };
+    HudLayer: Function & { readonly prototype: HudLayer; };
     Image: Function & { readonly prototype: Image; };
+    ImageButton: Function & { readonly prototype: ImageButton; };
+    InteractionEntity: Function & { readonly prototype: InteractionEntity; };
     IronGolemEntity: Function & { readonly prototype: IronGolemEntity; };
+    ItemDisplayEntity: Function & { readonly prototype: ItemDisplayEntity; };
     ItemFrameEntity: Function & { readonly prototype: ItemFrameEntity; };
     ItemStack: Function & { readonly prototype: ItemStack; };
     ItemStackBuilder: { new(itemId: string): ItemStackBuilder; };
     JavaClass: Function & { readonly prototype: JavaClass; };
     JavaObject: Function & { readonly prototype: JavaObject; };
+    Line3D: Function & { readonly prototype: Line3D; };
     LlamaEntity: Function & { readonly prototype: LlamaEntity; };
+    LockButton: Function & { readonly prototype: LockButton; };
+    LockButtonBuilder: { new(): LockButtonBuilder; };
+    MinecartFurnaceEntity: Function & { readonly prototype: MinecartFurnaceEntity; };
+    MinecartTntEntity: Function & { readonly prototype: MinecartTntEntity; };
     MobEntity: Function & { readonly prototype: MobEntity; };
     MushroomCowEntity: Function & { readonly prototype: MushroomCowEntity; };
     OcelotEntity: Function & { readonly prototype: OcelotEntity; };
+    PacketBuffer: { new(): PacketBuffer; };
+    PaintingEntity: Function & { readonly prototype: PaintingEntity; };
     PandaEntity: Function & { readonly prototype: PandaEntity; };
     ParrotEntity: Function & { readonly prototype: ParrotEntity; };
     PhantomEntity: Function & { readonly prototype: PhantomEntity; };
+    PigEntity: Function & { readonly prototype: PigEntity; };
     PiglinBruteEntity: Function & { readonly prototype: PiglinBruteEntity; };
     PiglinEntity: Function & { readonly prototype: PiglinEntity; };
     PillagerEntity: Function & { readonly prototype: PillagerEntity; };
@@ -2902,28 +6196,51 @@ interface NeoRoot {
     Pos2D: { new(x: number, y: number): Pos2D; };
     Pos3D: { new(x: number, y: number, z: number): Pos3D; };
     PrimedTntEntity: Function & { readonly prototype: PrimedTntEntity; };
+    ProjectileEntity: Function & { readonly prototype: ProjectileEntity; };
     PufferfishEntity: Function & { readonly prototype: PufferfishEntity; };
     RabbitEntity: Function & { readonly prototype: RabbitEntity; };
     RayHit: Function & { readonly prototype: RayHit; };
+    ReflectClass: Function & { readonly prototype: ReflectClass; };
+    ReflectConstructor: Function & { readonly prototype: ReflectConstructor; };
+    ReflectField: Function & { readonly prototype: ReflectField; };
+    ReflectMethod: Function & { readonly prototype: ReflectMethod; };
+    RenderElement3D: Function & { readonly prototype: RenderElement3D; };
     SalmonEntity: Function & { readonly prototype: SalmonEntity; };
+    ScreenCanvas: Function & { readonly prototype: ScreenCanvas; };
+    ScreenSpec: Function & { readonly prototype: ScreenSpec; };
     SheepEntity: Function & { readonly prototype: SheepEntity; };
     ShulkerEntity: Function & { readonly prototype: ShulkerEntity; };
+    Slider: Function & { readonly prototype: Slider; };
+    SliderBuilder: { new(): SliderBuilder; };
+    SlimeEntity: Function & { readonly prototype: SlimeEntity; };
     SnifferEntity: Function & { readonly prototype: SnifferEntity; };
     SnowGolemEntity: Function & { readonly prototype: SnowGolemEntity; };
+    SpellcasterIllagerEntity: Function & { readonly prototype: SpellcasterIllagerEntity; };
     SpiderEntity: Function & { readonly prototype: SpiderEntity; };
     StriderEntity: Function & { readonly prototype: StriderEntity; };
     Subscription: Function & { readonly prototype: Subscription; };
+    SuggestionsBuilder: Function & { readonly prototype: SuggestionsBuilder; };
+    Surface: Function & { readonly prototype: Surface; };
     TamableAnimalEntity: Function & { readonly prototype: TamableAnimalEntity; };
     TextComponent: Function & { readonly prototype: TextComponent; };
+    TextDisplayEntity: Function & { readonly prototype: TextDisplayEntity; };
+    TextFieldBuilder: { new(): TextFieldBuilder; };
+    Texture: Function & { readonly prototype: Texture; };
+    TexturedButtonBuilder: { new(): TexturedButtonBuilder; };
+    ThrownTridentEntity: Function & { readonly prototype: ThrownTridentEntity; };
     TimerHandle: Function & { readonly prototype: TimerHandle; };
+    TraceLine: Function & { readonly prototype: TraceLine; };
     TropicalFishEntity: Function & { readonly prototype: TropicalFishEntity; };
     TurtleEntity: Function & { readonly prototype: TurtleEntity; };
     VexEntity: Function & { readonly prototype: VexEntity; };
     VillagerEntity: Function & { readonly prototype: VillagerEntity; };
+    VindicatorEntity: Function & { readonly prototype: VindicatorEntity; };
     WanderingTraderEntity: Function & { readonly prototype: WanderingTraderEntity; };
     WardenEntity: Function & { readonly prototype: WardenEntity; };
+    Widget: Function & { readonly prototype: Widget; };
     WitchEntity: Function & { readonly prototype: WitchEntity; };
     WitherBossEntity: Function & { readonly prototype: WitherBossEntity; };
+    WitherSkullEntity: Function & { readonly prototype: WitherSkullEntity; };
     WolfEntity: Function & { readonly prototype: WolfEntity; };
     ZombieEntity: Function & { readonly prototype: ZombieEntity; };
     ZombieVillagerEntity: Function & { readonly prototype: ZombieVillagerEntity; };
@@ -2935,19 +6252,26 @@ interface NeoRoot {
     ChatTitleEvent: Function & { readonly prototype: ChatTitleEvent; };
     DialogCloseEvent: Function & { readonly prototype: DialogCloseEvent; };
     DialogOpenEvent: Function & { readonly prototype: DialogOpenEvent; };
+    EntityCustomNameEvent: Function & { readonly prototype: EntityCustomNameEvent; };
     EntityDamageEvent: Function & { readonly prototype: EntityDamageEvent; };
     EntityHealEvent: Function & { readonly prototype: EntityHealEvent; };
     EntityLoadEvent: Function & { readonly prototype: EntityLoadEvent; };
     EntitySpawnEvent: Function & { readonly prototype: EntitySpawnEvent; };
     EntityUnloadEvent: Function & { readonly prototype: EntityUnloadEvent; };
     GameQuitEvent: Function & { readonly prototype: GameQuitEvent; };
+    GameResourcePackEvent: Function & { readonly prototype: GameResourcePackEvent; };
     GameStartEvent: Function & { readonly prototype: GameStartEvent; };
     InputKeyPressEvent: Function & { readonly prototype: InputKeyPressEvent; };
     InputWheelEvent: Function & { readonly prototype: InputWheelEvent; };
     InventoryClickEvent: Function & { readonly prototype: InventoryClickEvent; };
     InventoryCloseEvent: Function & { readonly prototype: InventoryCloseEvent; };
+    InventoryDropSlotEvent: Function & { readonly prototype: InventoryDropSlotEvent; };
     InventoryOpenEvent: Function & { readonly prototype: InventoryOpenEvent; };
     InventoryUpdateEvent: Function & { readonly prototype: InventoryUpdateEvent; };
+    ItemDamageEvent: Function & { readonly prototype: ItemDamageEvent; };
+    ItemPickupEvent: Function & { readonly prototype: ItemPickupEvent; };
+    PacketReceiveEvent: Function & { readonly prototype: PacketReceiveEvent; };
+    PacketSendEvent: Function & { readonly prototype: PacketSendEvent; };
     PlayerAirEvent: Function & { readonly prototype: PlayerAirEvent; };
     PlayerArmorEvent: Function & { readonly prototype: PlayerArmorEvent; };
     PlayerAttackBlockEvent: Function & { readonly prototype: PlayerAttackBlockEvent; };
