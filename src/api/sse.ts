@@ -23,6 +23,33 @@ export type SseStatus = 'off' | 'connecting' | 'open' | 'reconnecting'
 
 type Handler<T> = (data: T) => void
 
+/** 一条 `segment` 帧的信封（超限事件分片；mod 端 SseHub.MAX_EVENT_BYTES） */
+interface SegmentEnvelope {
+  /** 原始事件名（重组后按此路由） */
+  ev: string
+  /** 分片组 id（一次 broadcast 一个） */
+  id: number
+  /** 组内序号（0 起） */
+  i: number
+  /** 组内分片总数 */
+  total: number
+  /** 原始 JSON 负载的切片 */
+  data: string
+}
+
+/** 单组分片的组装态 */
+interface SegmentGroup {
+  ev: string
+  total: number
+  parts: string[]
+  received: number
+}
+
+/** 同时在组装的分片组上限（超出丢最旧；断线后残组由环形回放补齐） */
+const MAX_SEGMENT_GROUPS = 8
+/** 单组分片数上限（mod 端 16 KiB/片 → 1 GiB 负载，正常结果远低于此） */
+const MAX_SEGMENT_TOTAL = 65_536
+
 export class SseManager {
   status = ref<SseStatus>('off')
   private source: EventSource | null = null
@@ -45,6 +72,8 @@ export class SseManager {
   private deadHandlers = new Set<Handler<void>>()
   /** 连续取票失败次数（连上即清零）；达到阈值判「服务已死」，触发 onDead */
   private failureStreak = 0
+  /** 分片组装缓冲：组 id → 已收到的分片（超限事件在 mod 端拆分） */
+  private segments = new Map<number, SegmentGroup>()
 
   onLog(fn: Handler<LogEntry>): () => void {
     this.logHandlers.add(fn)
@@ -146,6 +175,9 @@ export class SseManager {
       this.source.close()
       this.source = null
     }
+    // 断线丢弃未完成的分片组：重连后环形回放会补上整条 entry，
+    // 残缺片段拼不出合法 JSON，留在缓冲里只会污染下一条同 id 组。
+    this.segments.clear()
   }
 
   private async connect(): Promise<void> {
@@ -195,11 +227,90 @@ export class SseManager {
     source.addEventListener('config:changed', (e) => this.dispatch(this.configChangedHandlers, e.data))
     source.addEventListener('pairing:pending', (e) => this.dispatch(this.pairingPendingHandlers, e.data))
     source.addEventListener('update:available', (e) => this.dispatch(this.updateHandlers, e.data))
+    source.addEventListener('segment', (e) => this.onSegment(e.data))
     source.addEventListener('server:shutdown', () => {
       for (const fn of this.shutdownHandlers) fn()
       // 优雅停机：转重连态，持续探测直到服务回来
       if (!this.stopped) this.scheduleRetry()
     })
+  }
+
+  /**
+   * 组装一条被 mod 端按 64 KiB 上限拆分的事件：按组 id 攒齐分片、
+   * 拼回原始 JSON 后按 ev 路由，行为与未分片的直发帧一致。
+   * 分片在服务端同一把锁内连续写出，同组内不会与其他事件交错。
+   */
+  private onSegment(raw: string | null): void {
+    if (raw === null) return
+    let segment: SegmentEnvelope
+    try {
+      segment = JSON.parse(raw) as SegmentEnvelope
+    } catch {
+      return
+    }
+    if (
+      typeof segment.ev !== 'string' ||
+      typeof segment.id !== 'number' ||
+      !Number.isInteger(segment.i) ||
+      !Number.isInteger(segment.total) ||
+      segment.total < 1 ||
+      segment.total > MAX_SEGMENT_TOTAL ||
+      segment.i < 0 ||
+      segment.i >= segment.total ||
+      typeof segment.data !== 'string'
+    ) {
+      return
+    }
+    let group = this.segments.get(segment.id)
+    if (!group) {
+      if (segment.i !== 0) {
+        // 组头已丢（理论上仅在写入中途断线时出现）：整组放弃，等回放补
+        return
+      }
+      if (this.segments.size >= MAX_SEGMENT_GROUPS) {
+        const oldest = this.segments.keys().next().value
+        if (oldest !== undefined) this.segments.delete(oldest)
+      }
+      group = { ev: segment.ev, total: segment.total, parts: [], received: 0 }
+      this.segments.set(segment.id, group)
+    }
+    if (group.parts[segment.i] !== undefined) return
+    group.parts[segment.i] = segment.data
+    group.received++
+    if (group.received < group.total) return
+    this.segments.delete(segment.id)
+    this.route(group.ev, group.parts.join(''))
+  }
+
+  /** 按原始事件名把重组后的负载派发到对应的处理器集。 */
+  private route(ev: string, data: string): void {
+    switch (ev) {
+      case 'log':
+        return this.dispatch(this.logHandlers, data)
+      case 'console':
+        return this.dispatch(this.consoleHandlers, data)
+      case 'network':
+        return this.dispatch(this.networkHandlers, data)
+      case 'macro:state':
+        return this.dispatch(this.macroStateHandlers, data)
+      case 'macros:changed':
+        return this.dispatch(this.macrosChangedHandlers, data)
+      case 'memory:sample':
+        return this.dispatch(this.memoryHandlers, data)
+      case 'task:state':
+        return this.dispatch(this.taskStateHandlers, data)
+      case 'file:changed':
+        return this.dispatch(this.fileChangedHandlers, data)
+      case 'config:changed':
+        return this.dispatch(this.configChangedHandlers, data)
+      case 'pairing:pending':
+        return this.dispatch(this.pairingPendingHandlers, data)
+      case 'update:available':
+        return this.dispatch(this.updateHandlers, data)
+      default:
+        // 未知事件名：与未注册的直发帧一样静默忽略
+        return
+    }
   }
 
   private dispatch<T>(handlers: Set<Handler<T>>, raw: string | null): void {
